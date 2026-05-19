@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Travancore Transports Pvt. Ltd.</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════
+   RESET
+══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  background: #f0f0f0;
+  color: #4b4b4b;
+  overflow-x: hidden;
+}
+a { color: #7c60be; text-decoration: none; }
+ul { list-style: none; }
+button { cursor: pointer; font-family: inherit; }
+
+/* ══════════════════════════════════════════
+   ROOT LAYOUT — flex row fills viewport
+══════════════════════════════════════════ */
+.app-root {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ══════════════════════════════════════════
+   SIDEBAR
+══════════════════════════════════════════ */
+.sidebar {
+  width: 250px;
+  min-width: 250px;
+  background: #2b303b;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  transition: width 0.25s ease, min-width 0.25s ease;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+.sidebar.collapsed { width: 64px; min-width: 64px; }
+
+/* Sidebar header */
+.sidebar-header {
+  height: 60px;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+.sidebar-brand {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.2s, width 0.2s;
+}
+.sidebar.collapsed .sidebar-brand { opacity: 0; width: 0; }
+
+.sidebar-controls { display: flex; gap: 2px; flex-shrink: 0; }
+.icon-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  width: 28px; height: 28px;
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  transition: background 0.15s, color 0.15s;
+}
+.icon-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+/* Sidebar menu scrollable area */
+.sidebar-menu {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 20px;
+}
+.sidebar-menu::-webkit-scrollbar { width: 3px; }
+.sidebar-menu::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); }
+
+/* Menu items */
+.nav-list { padding: 0; }
+.nav-item { position: relative; }
+.nav-item.mt-top { margin-top: 20px; }
+
+/* Main nav link */
+.nav-link {
+  display: flex;
+  align-items: center;
+  padding: 12px 0 12px 20px;
+  color: #8b91a0;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s;
+  border-left: 3px solid transparent;
+  gap: 0;
+  position: relative;
+}
+.nav-link:hover { color: #fff; background: rgba(255,255,255,0.04); }
+.nav-item.active > .nav-link {
+  color: #fff;
+  border-left-color: #7c60be;
+  background: rgba(255,255,255,0.05);
+}
+.nav-link-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.2s;
+}
+.sidebar.collapsed .nav-link-text { opacity: 0; width: 0; pointer-events: none; }
+.sidebar.collapsed .nav-arrow { display: none; }
+
+/* Collapsed icon badge */
+.nav-badge {
+  position: absolute;
+  right: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 64px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.sidebar:not(.collapsed) .nav-badge { opacity: 0; }
+.sidebar.collapsed .nav-badge { opacity: 1; }
+
+/* Arrow */
+.nav-arrow {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(139,145,160,0.6);
+  font-size: 11px;
+  flex-shrink: 0;
+  transition: transform 0.22s;
+}
+.nav-item.open > .nav-link .nav-arrow { transform: rotate(180deg); }
+
+/* Sub-menu */
+.sub-nav {
+  display: none;
+  background: rgba(0,0,0,0.18);
+}
+.nav-item.open > .sub-nav { display: block; }
+
+.sub-nav .nav-link {
+  padding-left: 36px;
+  font-size: 12px;
+  font-weight: 400;
+  border-left: 3px solid transparent;
+}
+.sub-nav .sub-nav .nav-link { padding-left: 50px; }
+.sidebar.collapsed .sub-nav { display: none !important; }
+
+/* ══════════════════════════════════════════
+   MAIN COLUMN
+══════════════════════════════════════════ */
+.main-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ══════════════════════════════════════════
+   HEADER
+══════════════════════════════════════════ */
+.topbar {
+  height: 60px;
+  min-height: 60px;
+  background: #fff;
+  border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 5;
+  flex-shrink: 0;
+}
+.topbar-brand {
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: 6px;
+  color: #2b303b;
+}
+.mobile-menu-btn {
+  background: none; border: none;
+  font-size: 18px; color: #555;
+  display: none;
+  align-items: center; gap: 6px;
+  padding: 4px;
+}
+@media (max-width: 991px) { .mobile-menu-btn { display: flex; } }
+
+/* Avatar dropdown */
+.avatar-wrap { position: relative; }
+.avatar-btn {
+  background: none; border: none;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.avatar-circle {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: #2b303b;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 14px;
+}
+.avatar-dot {
+  position: absolute;
+  bottom: 1px; right: 0;
+  width: 9px; height: 9px;
+  background: #10cfbd;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+.avatar-dropdown {
+  display: none;
+  position: absolute;
+  right: 0; top: calc(100% + 10px);
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  min-width: 200px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  z-index: 100;
+  overflow: hidden;
+}
+.avatar-dropdown.open { display: block; }
+.dd-item {
+  display: block;
+  padding: 10px 16px;
+  color: #444;
+  font-size: 12.5px;
+  transition: background 0.12s;
+}
+.dd-item:hover { background: #f5f5f5; }
+.dd-item strong { font-weight: 700; }
+.dd-divider { border-top: 1px solid #f0f0f0; }
+.dd-hint { color: #aaa; font-size: 11px; padding: 8px 16px; display: block; }
+
+/* ══════════════════════════════════════════
+   SCROLL AREA
+══════════════════════════════════════════ */
+.page-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ══════════════════════════════════════════
+   BREADCRUMB
+══════════════════════════════════════════ */
+.breadbar {
+  background: #f8f8f8;
+  border-bottom: 1px solid #e8e8e8;
+  padding: 14px 20px;
+  flex-shrink: 0;
+}
+.breadcrumb {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #7c60be;
+}
+
+/* ══════════════════════════════════════════
+   CONTENT AREA
+══════════════════════════════════════════ */
+.content-area {
+  flex: 1;
+  padding: 16px 20px 0;
+}
+
+/* ══════════════════════════════════════════
+   STAT CARDS
+══════════════════════════════════════════ */
+.cards-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+  animation: fadeUp 0.35s ease both;
+}
+.cards-row:nth-child(2) { animation-delay: 0.08s; }
+.cards-row:nth-child(3) { animation-delay: 0.16s; }
+@media (max-width: 900px) { .cards-row { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px) { .cards-row { grid-template-columns: 1fr; } }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.stat-card {
+  border-radius: 2px;
+  padding: 18px 20px 20px;
+  position: relative;
+  overflow: hidden;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+.stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.14); }
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: rgba(255,255,255,0.28);
+}
+.stat-card.purple { background: #7c60be; }
+.stat-card.teal   { background: #10cfbd; }
+.stat-card.grey   { background: #6c6c6c; }
+
+.stat-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.82);
+  margin-bottom: 10px;
+}
+.stat-value {
+  font-size: 30px;
+  font-weight: 300;
+  color: #fff;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.stat-sub {
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.6);
+}
+
+/* ══════════════════════════════════════════
+   INNER PAGES
+══════════════════════════════════════════ */
+.page-view { display: none; }
+.page-view.active { display: flex; flex-direction: column; flex: 1; }
+
+.page-body {
+  flex: 1;
+  padding: 20px 20px 0;
+}
+.white-card {
+  background: #fff;
+  border-radius: 4px;
+  padding: 28px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+  margin-bottom: 20px;
+}
+.white-card h5 {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 20px;
+  color: #333;
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+@media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #999;
+}
+.form-input {
+  padding: 9px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'Montserrat', sans-serif;
+  color: #333;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+.form-input:focus { outline: none; border-color: #7c60be; }
+select.form-input { background: #fff; }
+
+.btn-primary {
+  padding: 10px 26px;
+  background: #7c60be;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: 'Montserrat', sans-serif;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: #6a4fad; }
+.btn-success {
+  padding: 10px 26px;
+  background: #10cfbd;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: 'Montserrat', sans-serif;
+  transition: background 0.15s;
+}
+
+.search-bar { display: flex; gap: 10px; margin-bottom: 20px; }
+.search-bar .form-input { flex: 1; }
+
+.placeholder-icon {
+  text-align: center;
+  padding: 50px 20px;
+  color: #bbb;
+}
+.placeholder-icon i { font-size: 48px; display: block; margin-bottom: 14px; }
+.placeholder-icon p { font-size: 13px; color: #aaa; }
+
+/* ══════════════════════════════════════════
+   FOOTER
+══════════════════════════════════════════ */
+.page-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #e0e0e0;
+  background: #f8f8f8;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.page-footer span { font-size: 11.5px; color: #aaa; }
+.page-footer a { font-size: 11.5px; color: #7c60be; font-weight: 500; }
+
+/* ══════════════════════════════════════════
+   MOBILE OVERLAY
+══════════════════════════════════════════ */
+.mob-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 9;
+}
+@media (max-width: 991px) {
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    width: 250px !important;
+    min-width: 250px !important;
+    z-index: 10;
+  }
+  .sidebar.mob-open {
+    transform: translateX(0);
+  }
+  .mob-overlay.show { display: block; }
+}
+
+/* ══════════════════════════════════════════
+   ALERT TOAST
+══════════════════════════════════════════ */
+.toast {
+  position: fixed;
+  top: 70px; right: 20px;
+  background: #10cfbd;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  z-index: 9999;
+  transform: translateX(120%);
+  transition: transform 0.3s ease;
+}
+.toast.show { transform: translateX(0); }
+.toast.error { background: #e74c3c; }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+<div class="mob-overlay" id="mobOverlay"></div>
+
+<!-- ════════════════════════════════════════════════════
+     APP ROOT  (flex row)
+════════════════════════════════════════════════════ -->
+<div class="app-root">
+
+  <!-- ▌SIDEBAR ▌-->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-brand">TTC</span>
+      <div class="sidebar-controls">
+        <button class="icon-btn" id="pinBtn" title="Collapse sidebar"><i class="fa fa-thumb-tack"></i></button>
+      </div>
+    </div>
+
+    <div class="sidebar-menu">
+      <ul class="nav-list">
+
+        <!-- Dashboard -->
+        <li class="nav-item mt-top active" data-key="dashboard">
+          <a class="nav-link" href="#" onclick="goto('dashboard');return false;">
+            <span class="nav-link-text">Dashboard</span>
+          </a>
+          <span class="nav-badge">db</span>
+        </li>
+
+        <!-- Search Consignment -->
+        <li class="nav-item" data-key="search">
+          <a class="nav-link" href="#" onclick="goto('search');return false;">
+            <span class="nav-link-text">Search Consignment</span>
+          </a>
+          <span class="nav-badge">sc</span>
+        </li>
+
+        <!-- New Consignment -->
+        <li class="nav-item" data-key="new-consignment">
+          <a class="nav-link" href="#" onclick="goto('new-consignment');return false;">
+            <span class="nav-link-text">New Consignment</span>
+          </a>
+          <span class="nav-badge">nc</span>
+        </li>
+
+        <!-- Inventory -->
+        <li class="nav-item" data-key="inventory">
+          <a class="nav-link" href="#" onclick="goto('inventory');return false;">
+            <span class="nav-link-text">Inventory</span>
+          </a>
+          <span class="nav-badge">it</span>
+        </li>
+
+        <!-- Incoming (accordion) -->
+        <li class="nav-item" id="acc-incoming">
+          <a class="nav-link" href="#" onclick="toggleAcc('acc-incoming');return false;">
+            <span class="nav-link-text">Incoming</span>
+            <span class="nav-arrow"><i class="fa fa-chevron-down"></i></span>
+          </a>
+          <span class="nav-badge"><i class="fa fa-credit-card" style="font-size:11px"></i></span>
+          <ul class="sub-nav nav-list">
+            <li class="nav-item" data-key="incoming-trips">
+              <a class="nav-link" href="#" onclick="goto('incoming-trips');return false;">
+                <span class="nav-link-text">Lorry Trips</span>
+              </a>
+              <span class="nav-badge">lt</span>
+            </li>
+          </ul>
+        </li>
+
+        <!-- Outgoing (accordion) -->
+        <li class="nav-item" id="acc-outgoing">
+          <a class="nav-link" href="#" onclick="toggleAcc('acc-outgoing');return false;">
+            <span class="nav-link-text">Outgoing</span>
+            <span class="nav-arrow"><i class="fa fa-chevron-down"></i></span>
+          </a>
+          <span class="nav-badge"><i class="fa fa-credit-card" style="font-size:11px"></i></span>
+          <ul class="sub-nav nav-list">
+
+            <!-- Lorry sub-accordion -->
+            <li class="nav-item" id="acc-lorry">
+              <a class="nav-link" href="#" onclick="toggleAcc('acc-lorry');return false;">
+                <span class="nav-link-text">Lorry</span>
+                <span class="nav-arrow"><i class="fa fa-chevron-down"></i></span>
+              </a>
+              <span class="nav-badge">lr</span>
+              <ul class="sub-nav nav-list">
+                <li class="nav-item" data-key="lorry-add">
+                  <a class="nav-link" href="#" onclick="goto('lorry-add');return false;"><span class="nav-link-text">Add</span></a>
+                  <span class="nav-badge">al</span>
+                </li>
+                <li class="nav-item" data-key="lorry-list">
+                  <a class="nav-link" href="#" onclick="goto('lorry-list');return false;"><span class="nav-link-text">List</span></a>
+                  <span class="nav-badge">ll</span>
+                </li>
+              </ul>
+            </li>
+
+            <!-- Lorry Challan sub-accordion -->
+            <li class="nav-item" id="acc-challan">
+              <a class="nav-link" href="#" onclick="toggleAcc('acc-challan');return false;">
+                <span class="nav-link-text">Lorry Challan</span>
+                <span class="nav-arrow"><i class="fa fa-chevron-down"></i></span>
+              </a>
+              <span class="nav-badge">lc</span>
+              <ul class="sub-nav nav-list">
+                <li class="nav-item" data-key="challan-id">
+                  <a class="nav-link" href="#" onclick="goto('challan-id');return false;"><span class="nav-link-text">Create (by ID)</span></a>
+                  <span class="nav-badge">cd</span>
+                </li>
+                <li class="nav-item" data-key="challan-filter">
+                  <a class="nav-link" href="#" onclick="goto('challan-filter');return false;"><span class="nav-link-text">Create (by filter)</span></a>
+                  <span class="nav-badge">cf</span>
+                </li>
+                <li class="nav-item" data-key="challan-list">
+                  <a class="nav-link" href="#" onclick="goto('challan-list');return false;"><span class="nav-link-text">List</span></a>
+                  <span class="nav-badge">lc</span>
+                </li>
+              </ul>
+            </li>
+
+            <!-- Trips/HPA sub-accordion -->
+            <li class="nav-item" id="acc-trips">
+              <a class="nav-link" href="#" onclick="toggleAcc('acc-trips');return false;">
+                <span class="nav-link-text">Trips / HPA</span>
+                <span class="nav-arrow"><i class="fa fa-chevron-down"></i></span>
+              </a>
+              <span class="nav-badge">tr</span>
+              <ul class="sub-nav nav-list">
+                <li class="nav-item" data-key="trip-create">
+                  <a class="nav-link" href="#" onclick="goto('trip-create');return false;"><span class="nav-link-text">Create</span></a>
+                  <span class="nav-badge">ct</span>
+                </li>
+                <li class="nav-item" data-key="trip-list">
+                  <a class="nav-link" href="#" onclick="goto('trip-list');return false;"><span class="nav-link-text">List</span></a>
+                  <span class="nav-badge">lt</span>
+                </li>
+              </ul>
+            </li>
+
+          </ul>
+        </li>
+
+      </ul>
+    </div><!-- /sidebar-menu -->
+  </nav>
+  <!-- END SIDEBAR -->
+
+
+  <!-- ▌MAIN COLUMN ▌-->
+  <div class="main-col">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="mobile-menu-btn" id="mobMenuBtn">
+          <i class="fa fa-bars"></i>
+        </button>
+        <span class="topbar-brand">T T C</span>
+      </div>
+
+      <div class="avatar-wrap">
+        <button class="avatar-btn" id="avatarBtn" aria-label="User menu">
+          <div class="avatar-circle"><i class="fa fa-user"></i></div>
+          <div class="avatar-dot"></div>
+        </button>
+        <div class="avatar-dropdown" id="avatarDrop">
+          <a href="#" class="dd-item">Signed in as<br><strong>ttc_bhilwara</strong></a>
+          <div class="dd-divider"></div>
+          <a href="#" class="dd-item" onclick="goto('profile');closeDrop();return false;">Your Profile</a>
+          <a href="#" class="dd-item" onclick="goto('logout');closeDrop();return false;">Logout</a>
+          <div class="dd-divider"></div>
+          <span class="dd-hint">Last login at<br>May 1, 2026, 10:25 p.m.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCROLLABLE PAGE AREA -->
+    <div class="page-scroll" id="pageScroll">
+
+      <!-- ══ DASHBOARD ══ -->
+      <div class="page-view active" id="pv-dashboard">
+        <div class="breadbar"><div class="breadcrumb">Dashboard</div></div>
+        <div class="content-area">
+
+          <div class="cards-row">
+            <div class="stat-card purple">
+              <div class="stat-label">Inventory consignments</div>
+              <div class="stat-value" id="s-inv-con">0</div>
+              <div class="stat-sub">total count</div>
+            </div>
+            <div class="stat-card purple">
+              <div class="stat-label">Inventory packages</div>
+              <div class="stat-value" id="s-inv-pkg">0</div>
+              <div class="stat-sub">total count</div>
+            </div>
+            <div class="stat-card purple">
+              <div class="stat-label">Inventory weight</div>
+              <div class="stat-value" id="s-inv-wt">0</div>
+              <div class="stat-sub">total actual weight</div>
+            </div>
+          </div>
+
+          <div class="cards-row">
+            <div class="stat-card teal">
+              <div class="stat-label">Total booking</div>
+              <div class="stat-value" id="s-mon-bk">0</div>
+              <div class="stat-sub">for this month</div>
+            </div>
+            <div class="stat-card teal">
+              <div class="stat-label">Total booking</div>
+              <div class="stat-value" id="s-mon-fr">Rs. None</div>
+              <div class="stat-sub">for this month</div>
+            </div>
+            <div class="stat-card teal">
+              <div class="stat-label">Trips</div>
+              <div class="stat-value" id="s-mon-tr">0</div>
+              <div class="stat-sub">trips this month</div>
+            </div>
+          </div>
+
+          <div class="cards-row">
+            <div class="stat-card grey">
+              <div class="stat-label">Total booking</div>
+              <div class="stat-value" id="s-day-bk">0</div>
+              <div class="stat-sub">for today</div>
+            </div>
+            <div class="stat-card grey">
+              <div class="stat-label">Total booking</div>
+              <div class="stat-value" id="s-day-fr">Rs. 0</div>
+              <div class="stat-sub">for today</div>
+            </div>
+            <div class="stat-card grey">
+              <div class="stat-label">Total booking weight</div>
+              <div class="stat-value" id="s-day-wt">0 Kg</div>
+              <div class="stat-sub">for today</div>
+            </div>
+          </div>
+
+        </div>
+        <div style="flex:1"></div>
+        <div class="page-footer">
+          <span>Copyright © 2024 <strong style="color:#666;font-family:inherit">TTC</strong>. All rights reserved.</span>
+          <a href="https://www.ttcpl.in/" target="_blank">Travancore Transports Pvt. Ltd.</a>
+        </div>
+      </div>
+
+      <!-- ══ SEARCH CONSIGNMENT ══ -->
+      <div class="page-view" id="pv-search">
+        <div class="breadbar"><div class="breadcrumb">Search Consignment</div></div>
+        <div class="page-body">
+          <div class="white-card">
+            <h5>Search Consignment</h5>
+            <div class="search-bar">
+              <input class="form-input" id="searchQ" type="text" placeholder="Enter CN Number (e.g. TTC001001)…" onkeydown="if(event.key==='Enter')doSearch()">
+              <button class="btn-primary" onclick="doSearch()">Search</button>
+            </div>
+            <div id="searchOut" style="font-size:13px;color:#aaa">Enter a consignment number to search.</div>
+          </div>
+        </div>
+        <div style="flex:1"></div>
+        <div class="page-footer">
+          <span>Copyright © 2024 TTC. All rights reserved.</span>
+          <a href="https://www.ttcpl.in/" target="_blank">Travancore Transports Pvt. Ltd.</a>
+        </div>
+      </div>
+
+      <!-- ══ NEW CONSIGNMENT ══ -->
+      <div class="page-view" id="pv-new-consignment">
+        <div class="breadbar"><div class="breadcrumb">New Consignment</div></div>
+        <div class="page-body">
+          <div class="white-card">
+            <h5>Create New Consignment</h5>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Sender Name *</label><input class="form-input" id="nc-sname" placeholder="Sender name"></div>
+              <div class="form-group"><label class="form-label">Receiver Name *</label><input class="form-input" id="nc-rname" placeholder="Receiver name"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Sender Phone</label><input class="form-input" id="nc-sphone" placeholder="Phone number"></div>
+              <div class="form-group"><label class="form-label">Receiver Phone</label><input class="form-input" id="nc-rphone" placeholder="Phone number"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Origin *</label><input class="form-input" id="nc-origin" placeholder="From city"></div>
+              <div class="form-group"><label class="form-label">Destination *</label><input class="form-input" id="nc-dest" placeholder="To city"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Packages</label><input class="form-input" id="nc-pkg" type="number" min="1" value="1"></div>
+              <div class="form-group"><label class="form-label">Weight (Kg)</label><input class="form-input" id="nc-wt" type="number" step="0.01" placeholder="0.00"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Rate (Rs/Kg)</label><input class="form-input" id="nc-rate" type="number" step="0.01" placeholder="0.00"></div>
+              <div class="form-group"><label class="form-label">Payment Mode</label>
+                <select class="form-input" id="nc-pay"><option>ToPay</option><option>Paid</option><option>ToBeBilled</option></select>
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom:20px">
+              <label class="form-label">Remarks</label>
+              <input class="form-input" id="nc-rem" placeholder="Optional remarks">
+            </div>
+            <button class="btn-primary" onclick="createConsignment()">Create Consignment</button>
+          </div>
+        </div>
+        <div style="flex:1"></div>
+        <div class="page-footer">
+          <span>Copyright © 2024 TTC. All rights reserved.</span>
+          <a href="https://www.ttcpl.in/" target="_blank">Travancore Transports Pvt. Ltd.</a>
+        </div>
+      </div>
+
+      <!-- ══ INVENTORY ══ -->
+      <div class="page-view" id="pv-inventory">
+        <div class="breadbar"><div class="breadcrumb">Inventory</div></div>
+        <div class="page-body">
+          <div class="white-card">
+            <h5>Inventory Consignments</h5>
+            <div id="invTable">
+              <div class="placeholder-icon">
+                <i class="fa fa-inbox"></i>
+                <p>No consignments in inventory.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1"></div>
+        <div class="page-footer">
+          <span>Copyright © 2024 TTC. All rights reserved.</span>
+          <a href="https://www.ttcpl.in/" target="_blank">Travancore Transports Pvt. Ltd.</a>
+        </div>
+      </div>
+
+      <!-- ══ GENERIC PAGE (reused for all other nav items) ══ -->
+      <div class="page-view" id="pv-generic">
+        <div class="breadbar"><div class="breadcrumb" id="gen-bc">Page</div></div>
+        <div class="page-body">
+          <div class="white-card">
+            <div class="placeholder-icon">
+              <i class="fa fa-wrench"></i>
+              <p id="gen-msg">This section is ready to connect to your backend API.</p>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1"></div>
+        <div class="page-footer">
+          <span>Copyright © 2024 TTC. All rights reserved.</span>
+          <a href="https://www.ttcpl.in/" target="_blank">Travancore Transports Pvt. Ltd.</a>
+        </div>
+      </div>
+
+    </div><!-- /page-scroll -->
+  </div><!-- /main-col -->
+
+</div><!-- /app-root -->
+
+<script>
+/* ═══════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════ */
+const DB = { consignments: [], lorries: [], trips: [] };
+
+const PAGE_LABELS = {
+  dashboard:      'Dashboard',
+  search:         'Search Consignment',
+  'new-consignment': 'New Consignment',
+  inventory:      'Inventory',
+  'incoming-trips': 'Incoming — Lorry Trips',
+  'lorry-add':    'Add Lorry',
+  'lorry-list':   'Lorry List',
+  'challan-id':   'Create Challan (by ID)',
+  'challan-filter':'Create Challan (by filter)',
+  'challan-list': 'Lorry Challan List',
+  'trip-create':  'Create Trip / HPA',
+  'trip-list':    'Outgoing Trips List',
+  profile:        'Your Profile',
+  logout:         'Logout',
+};
+
+// Pages that have their own pv-* element
+const OWNED_PAGES = ['dashboard','search','new-consignment','inventory'];
+
+/* ═══════════════════════════════════════════════
+   SIDEBAR PIN / COLLAPSE
+═══════════════════════════════════════════════ */
+const sidebar = document.getElementById('sidebar');
+const pinBtn  = document.getElementById('pinBtn');
+let pinned = true;
+
+pinBtn.addEventListener('click', () => {
+  pinned = !pinned;
+  sidebar.classList.toggle('collapsed', !pinned);
+  pinBtn.querySelector('i').className = pinned ? 'fa fa-thumb-tack' : 'fa fa-thumb-tack';
+  pinBtn.style.opacity = pinned ? '1' : '0.45';
+});
+
+/* ═══════════════════════════════════════════════
+   MOBILE SIDEBAR
+═══════════════════════════════════════════════ */
+const mobBtn     = document.getElementById('mobMenuBtn');
+const mobOverlay = document.getElementById('mobOverlay');
+
+mobBtn.addEventListener('click', () => {
+  sidebar.classList.add('mob-open');
+  mobOverlay.classList.add('show');
+});
+mobOverlay.addEventListener('click', () => {
+  sidebar.classList.remove('mob-open');
+  mobOverlay.classList.remove('show');
+});
+
+/* ═══════════════════════════════════════════════
+   ACCORDION
+═══════════════════════════════════════════════ */
+function toggleAcc(id) {
+  const el = document.getElementById(id);
+  // Close siblings at same level
+  const parent = el.parentElement;
+  parent.querySelectorAll(':scope > .nav-item.open').forEach(s => {
+    if (s !== el) s.classList.remove('open');
+  });
+  el.classList.toggle('open');
+}
+
+/* ═══════════════════════════════════════════════
+   NAVIGATION
+═══════════════════════════════════════════════ */
+function goto(key) {
+  // Close mobile
+  sidebar.classList.remove('mob-open');
+  mobOverlay.classList.remove('show');
+
+  // Active state
+  document.querySelectorAll('.nav-item[data-key]').forEach(li => li.classList.remove('active'));
+  const target = document.querySelector(`.nav-item[data-key="${key}"]`);
+  if (target) {
+    target.classList.add('active');
+    // Open ancestor accordions
+    let p = target.parentElement.closest('.nav-item');
+    while (p) { p.classList.add('open'); p = p.parentElement.closest('.nav-item'); }
+  }
+
+  // Show page
+  document.querySelectorAll('.page-view').forEach(v => v.classList.remove('active'));
+
+  if (OWNED_PAGES.includes(key)) {
+    document.getElementById('pv-' + key).classList.add('active');
+  } else {
+    const gen = document.getElementById('pv-generic');
+    gen.classList.add('active');
+    document.getElementById('gen-bc').textContent  = PAGE_LABELS[key] || key;
+    document.getElementById('gen-msg').textContent = `"${PAGE_LABELS[key] || key}" — connect this to your backend API.`;
+  }
+
+  // Scroll to top
+  document.getElementById('pageScroll').scrollTop = 0;
+}
+
+/* ═══════════════════════════════════════════════
+   AVATAR DROPDOWN
+═══════════════════════════════════════════════ */
+const avatarBtn  = document.getElementById('avatarBtn');
+const avatarDrop = document.getElementById('avatarDrop');
+
+avatarBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  avatarDrop.classList.toggle('open');
+});
+document.addEventListener('click', () => avatarDrop.classList.remove('open'));
+function closeDrop() { avatarDrop.classList.remove('open'); }
+
+/* ═══════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════ */
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error' : '');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/* ═══════════════════════════════════════════════
+   SEARCH CONSIGNMENT
+═══════════════════════════════════════════════ */
+function doSearch() {
+  const q   = document.getElementById('searchQ').value.trim();
+  const out = document.getElementById('searchOut');
+  if (!q) { out.innerHTML = '<span style="color:#e74c3c">Please enter a consignment number.</span>'; return; }
+  const found = DB.consignments.filter(c => c.cnNo.toLowerCase().includes(q.toLowerCase()));
+  if (!found.length) {
+    out.innerHTML = `<span style="color:#e74c3c">No consignment found for <strong>"${q}"</strong>.</span>`;
+  } else {
+    out.innerHTML = found.map(c => `
+      <div style="border:1px solid #eee;border-radius:4px;padding:12px 16px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+        <span><strong>${c.cnNo}</strong> &nbsp;${c.origin} → ${c.destination}</span>
+        <span style="background:#7c60be;color:#fff;font-size:10px;padding:3px 10px;border-radius:10px;font-weight:700">${c.status}</span>
+      </div>`).join('');
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   CREATE CONSIGNMENT
+═══════════════════════════════════════════════ */
+function createConsignment() {
+  const sname  = document.getElementById('nc-sname').value.trim();
+  const rname  = document.getElementById('nc-rname').value.trim();
+  const origin = document.getElementById('nc-origin').value.trim();
+  const dest   = document.getElementById('nc-dest').value.trim();
+
+  if (!sname || !rname || !origin || !dest) {
+    showToast('Please fill all required fields.', true);
+    return;
+  }
+
+  const cnNo = 'TTC' + String(DB.consignments.length + 1001).padStart(6, '0');
+  const wt   = parseFloat(document.getElementById('nc-wt').value) || 0;
+  const rate = parseFloat(document.getElementById('nc-rate').value) || 0;
+
+  DB.consignments.push({
+    cnNo, origin, dest,
+    sender: sname, receiver: rname,
+    packages: parseInt(document.getElementById('nc-pkg').value) || 1,
+    weight: wt, freight: wt * rate,
+    status: 'booked'
+  });
+
+  // Clear form
+  ['nc-sname','nc-rname','nc-sphone','nc-rphone','nc-origin','nc-dest','nc-rem'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('nc-pkg').value = '1';
+  document.getElementById('nc-wt').value = '';
+  document.getElementById('nc-rate').value = '';
+
+  refreshStats();
+  showToast(`✓ Consignment ${cnNo} created!`);
+  goto('inventory');
+  refreshInventory();
+}
+
+/* ═══════════════════════════════════════════════
+   REFRESH INVENTORY TABLE
+═══════════════════════════════════════════════ */
+function refreshInventory() {
+  const el = document.getElementById('invTable');
+  const inv = DB.consignments.filter(c => c.status === 'booked' || c.status === 'inventory');
+  if (!inv.length) {
+    el.innerHTML = '<div class="placeholder-icon"><i class="fa fa-inbox"></i><p>No consignments in inventory.</p></div>';
+    return;
+  }
+  el.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+      <thead>
+        <tr style="border-bottom:2px solid #eee">
+          <th style="padding:8px 10px;text-align:left;font-weight:700;color:#888;font-size:10.5px;letter-spacing:1px;text-transform:uppercase">CN No</th>
+          <th style="padding:8px 10px;text-align:left;font-weight:700;color:#888;font-size:10.5px;letter-spacing:1px;text-transform:uppercase">Sender</th>
+          <th style="padding:8px 10px;text-align:left;font-weight:700;color:#888;font-size:10.5px;letter-spacing:1px;text-transform:uppercase">Receiver</th>
+          <th style="padding:8px 10px;text-align:left;font-weight:700;color:#888;font-size:10.5px;letter-spacing:1px;text-transform:uppercase">From</th>
+          <th style="padding:8px 10px;text-align:left;font-weight:700;color:#888;font-size:10.5px;letter-spacing:1px;text-transform:uppercase">To</th>
+          <th style="padding:8px 10px;text-align:left;font-weight:700;color:#888;font-size:10.5px;letter-spacing:1px;text-transform:uppercase">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${inv.map((c,i) => `
+          <tr style="border-bottom:1px solid #f0f0f0;background:${i%2===0?'#fff':'#fafafa'}">
+            <td style="padding:9px 10px;font-weight:600;color:#7c60be">${c.cnNo}</td>
+            <td style="padding:9px 10px">${c.sender}</td>
+            <td style="padding:9px 10px">${c.receiver}</td>
+            <td style="padding:9px 10px">${c.origin}</td>
+            <td style="padding:9px 10px">${c.dest}</td>
+            <td style="padding:9px 10px"><span style="background:#10cfbd;color:#fff;padding:2px 10px;border-radius:10px;font-size:10.5px;font-weight:700">${c.status}</span></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+/* ═══════════════════════════════════════════════
+   REFRESH DASHBOARD STATS
+═══════════════════════════════════════════════ */
+function refreshStats() {
+  const inv = DB.consignments.filter(c => c.status === 'inventory' || c.status === 'booked');
+  document.getElementById('s-inv-con').textContent = inv.length;
+  document.getElementById('s-inv-pkg').textContent = inv.reduce((a,c) => a + (c.packages||0), 0);
+  document.getElementById('s-inv-wt').textContent  = inv.reduce((a,c) => a + (c.weight||0), 0).toFixed(1);
+
+  const total = DB.consignments.length;
+  const totalFr = DB.consignments.reduce((a,c) => a + (c.freight||0), 0);
+  document.getElementById('s-mon-bk').textContent = total;
+  document.getElementById('s-mon-fr').textContent = total > 0 ? 'Rs. ' + totalFr.toFixed(0) : 'Rs. None';
+  document.getElementById('s-mon-tr').textContent = DB.trips.length;
+
+  document.getElementById('s-day-bk').textContent = total;
+  document.getElementById('s-day-fr').textContent = 'Rs. ' + totalFr.toFixed(0);
+  document.getElementById('s-day-wt').textContent = DB.consignments.reduce((a,c) => a + (c.weight||0), 0).toFixed(1) + ' Kg';
+}
+
+/* ═══════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════ */
+goto('dashboard');
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "users": [
+    {
+      "id": "4a41394e-8109-4803-8a36-f100e3b0bb15",
+      "username": "ttc_bhilwara",
+      "password": "$2b$10$KDl9nUVwBbQSzhNEILqZG.x7N/y4.mPrz4GASr9qBXySFjw06ljGO",
+      "name": "TTC Bhilwara",
+      "role": "admin",
+      "created_at": "2026-05-11T11:23:56.599Z",
+      "last_login": "2026-05-12T04:35:28.420Z"
+    }
+  ],
+  "consignments": [],
+  "lorries": [],
+  "trips": [],
+  "challans": [],
+  "incoming_trips": []
+}
