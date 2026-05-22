@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 
 import api from "@/lib/api";
 import { AddClientDialog } from "@/components/clients/AddClientDialog";
+import { useRouter } from "next/navigation";
 
 export default function ClientsPage() {
+  const router = useRouter();
   const [clientList, setClientList] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -105,8 +107,22 @@ export default function ClientsPage() {
                   </div>
 
                   <div className="mt-6 flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1 text-xs">View Invoices</Button>
-                    <Button variant="outline" size="sm" className="flex-1 text-xs">Analytics</Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1 text-xs hover:bg-primary/20 hover:border-primary/50 text-zinc-300"
+                      onClick={() => router.push(`/invoices?client=${encodeURIComponent(client.name)}`)}
+                    >
+                      View Invoices
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1 text-xs hover:bg-primary/20 hover:border-primary/50 text-zinc-300"
+                      onClick={() => router.push(`/analytics?client=${encodeURIComponent(client.name)}`)}
+                    >
+                      Analytics
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

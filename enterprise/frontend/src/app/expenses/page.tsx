@@ -29,6 +29,32 @@ export default function ExpensesPage() {
     }
   };
 
+  const handleExport = () => {
+    const headers = ["Category", "Vehicle", "Amount", "Date", "Description"];
+    const csvRows = [headers.join(",")];
+    
+    currentExpenses.forEach(e => {
+      const row = [
+        e.category || "",
+        e.vehicle?.vehicleNo || "N/A",
+        e.amount || 0,
+        e.date ? new Date(e.date).toLocaleDateString() : "",
+        `"${(e.description || "").replace(/"/g, '""')}"`
+      ];
+      csvRows.push(row.join(","));
+    });
+    
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `expenses_report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   React.useEffect(() => {
     fetchExpenses();
   }, []);
@@ -54,7 +80,7 @@ export default function ExpensesPage() {
             <p className="text-muted-foreground">Monitor and manage all operational expenses.</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleExport}>
               <Download className="w-4 h-4 mr-2" /> Export
             </Button>
             <AddExpenseDialog onExpenseAdded={fetchExpenses} />

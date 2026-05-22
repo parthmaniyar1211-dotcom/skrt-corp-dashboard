@@ -18,10 +18,13 @@ import { cn } from "@/lib/utils";
 
 import api from "@/lib/api";
 import { AddVehicleDialog } from "@/components/fleet/AddVehicleDialog";
+import { ScheduleServiceDialog } from "@/components/fleet/ScheduleServiceDialog";
 
 export default function FleetPage() {
   const [vehicleList, setVehicleList] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [selectedVehicle, setSelectedVehicle] = React.useState<any>(null);
+  const [serviceDialogOpen, setServiceDialogOpen] = React.useState(false);
 
   const fetchVehicles = async () => {
     try {
@@ -140,7 +143,15 @@ export default function FleetPage() {
                       {v.lastServiceDate ? new Date(v.lastServiceDate).toLocaleDateString() : "No record"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" className="hover:bg-primary/20 hover:text-primary">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="hover:bg-primary/20 hover:text-primary"
+                        onClick={() => {
+                          setSelectedVehicle(v);
+                          setServiceDialogOpen(true);
+                        }}
+                      >
                         <Wrench className="w-4 h-4 mr-2" /> Schedule Service
                       </Button>
                     </TableCell>
@@ -151,6 +162,13 @@ export default function FleetPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ScheduleServiceDialog 
+        open={serviceDialogOpen} 
+        onOpenChange={setServiceDialogOpen} 
+        vehicle={selectedVehicle} 
+        onServiceScheduled={fetchVehicles} 
+      />
     </DashboardLayout>
   );
 }

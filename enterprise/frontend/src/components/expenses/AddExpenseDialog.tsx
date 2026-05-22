@@ -69,25 +69,25 @@ export function AddExpenseDialog({ onExpenseAdded }: { onExpenseAdded: () => voi
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-primary hover:bg-primary/90">
+        <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 shadow-md transition-all active:scale-95">
           <Plus className="w-4 h-4 mr-2" /> Add Expense
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto overflow-x-hidden w-full max-w-[425px] box-border">
-        <DialogHeader>
-          <DialogTitle>Record Expense</DialogTitle>
+      <DialogContent className="bg-zinc-950 border border-zinc-800 text-zinc-100 max-h-[90vh] overflow-y-auto overflow-x-hidden w-full max-w-[425px] rounded-2xl shadow-2xl p-6 box-border">
+        <DialogHeader className="pb-2 border-b border-zinc-900">
+          <DialogTitle className="text-xl font-bold text-zinc-100">Record Expense</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-4 w-full box-border">
-          <div className="space-y-2">
-            <Label>Category</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold text-zinc-300">Category *</Label>
             <Select 
               value={formData.category} 
               onValueChange={(v) => setFormData({...formData, category: v})}
             >
-              <SelectTrigger>
+              <SelectTrigger className="bg-zinc-900 border-zinc-800 text-zinc-100 focus:border-primary/50 focus:ring-primary/50 rounded-lg text-sm">
                 <SelectValue placeholder="Select Category" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-zinc-950 border-zinc-800 text-zinc-100">
                 <SelectItem value="Fuel">Fuel</SelectItem>
                 <SelectItem value="Maintenance">Maintenance</SelectItem>
                 <SelectItem value="Toll">Toll</SelectItem>
@@ -97,27 +97,28 @@ export function AddExpenseDialog({ onExpenseAdded }: { onExpenseAdded: () => voi
             </Select>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="amount">Amount (₹)</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="amount" className="text-xs font-semibold text-zinc-300">Amount (₹) *</Label>
             <Input 
               id="amount" 
               type="number"
               required
+              className="bg-zinc-900 border-zinc-800 text-zinc-100 focus:border-primary/50 focus:ring-primary/50 rounded-lg text-sm"
               value={formData.amount} 
               onChange={(e) => setFormData({...formData, amount: Number(e.target.value)})} 
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Vehicle (Optional)</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold text-zinc-300">Vehicle (Optional)</Label>
             <Select 
               value={formData.vehicle} 
               onValueChange={(v) => setFormData({...formData, vehicle: v})}
             >
-              <SelectTrigger>
+              <SelectTrigger className="bg-zinc-900 border-zinc-800 text-zinc-100 focus:border-primary/50 focus:ring-primary/50 rounded-lg text-sm">
                 <SelectValue placeholder="Select Vehicle" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-zinc-950 border-zinc-800 text-zinc-100">
                 <SelectItem value="none">None</SelectItem>
                 {vehicles.map((v) => (
                   <SelectItem key={v._id} value={v._id}>{v.vehicleNo}</SelectItem>
@@ -126,30 +127,45 @@ export function AddExpenseDialog({ onExpenseAdded }: { onExpenseAdded: () => voi
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="date">Date</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="date" className="text-xs font-semibold text-zinc-300">Date *</Label>
             <Input 
               id="date" 
               type="date"
               required
+              className="bg-zinc-900 border-zinc-800 text-zinc-100 focus:border-primary/50 focus:ring-primary/50 rounded-lg text-sm"
               value={formData.date} 
               onChange={(e) => setFormData({...formData, date: e.target.value})} 
+              style={{ colorScheme: "dark" }}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="description" className="text-xs font-semibold text-zinc-300">Description</Label>
             <Input 
               id="description" 
               placeholder="e.g. NH-48 Toll"
+              className="bg-zinc-900 border-zinc-800 text-zinc-100 focus:border-primary/50 focus:ring-primary/50 rounded-lg text-sm"
               value={formData.description} 
               onChange={(e) => setFormData({...formData, description: e.target.value})} 
             />
           </div>
 
-          <DialogFooter>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Recording..." : "Record Expense"}
+          <DialogFooter className="pt-2 border-t border-zinc-900">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              onClick={() => setOpen(false)}
+              className="hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200"
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={loading}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 shadow-md transition-all active:scale-95"
+            >
+              {loading ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </form>

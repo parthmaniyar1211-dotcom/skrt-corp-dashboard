@@ -17,15 +17,9 @@ const seedData = async () => {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ MongoDB connected for seeding...');
 
-    // ── Clear collections ────────────────────────────────────────────────────
-    await Promise.all([
-      Shipment.deleteMany({}),
-      Vehicle.deleteMany({}),
-      User.deleteMany({}),
-      Invoice.deleteMany({}),
-      Inventory.deleteMany({})
-    ]);
-    console.log('🗑️  Cleared all existing data.');
+    // ── Clear database ───────────────────────────────────────────────────────
+    await mongoose.connection.db.dropDatabase();
+    console.log('🗑️  Cleared existing database and all indexes.');
 
     // ── Create Admin User ────────────────────────────────────────────────────
     // Pre-hash the password and bypass Mongoose middleware via collection.insertOne
@@ -75,29 +69,70 @@ const seedData = async () => {
     // totalFreight, createdBy
     const shipments = await Shipment.create([
       {
-        shipmentId:   'SKRT-1001',
-        sender:       { name: 'Aditya Textiles', phone: '9876543210', address: 'Bhilwara' },
-        receiver:     { name: 'Gujarat Fabrics', phone: '9123456780', address: 'Ahmedabad' },
-        origin:       'Bhilwara',
-        destination:  'Ahmedabad',
-        weight:       2500,
+        consignmentNumber: 'SKRT-1001',
+        toBranch:          'Ahmedabad',
+        consignor: {
+          gst:         '08AIMPG1878N1ZL',
+          name:        'Aditya Textiles',
+          phoneNumber: '9876543210',
+          state:       'Rajasthan',
+          city:        'Bhilwara'
+        },
+        consignee: {
+          gst:         '24BBBBB2222B2Z2',
+          name:        'Gujarat Fabrics',
+          phoneNumber: '9123456780',
+          state:       'Gujarat',
+          city:        'Ahmedabad'
+        },
+        invoiceValue: 500000,
+        description:  'Cotton Yarn Bales',
+        quantity:     50,
+        packageType:  'Bale',
+        privateNumber: 'P-9874',
+        actualWeight: 2500,
+        chargedWeight: 2500,
+        rateType:     'Kg',
         rate:         18,
-        totalFreight: 45000,
         paymentMode:  'Paid',
-        status:       'in-transit',
+        totalFreight: 45000,
+        totalPayable: 45000,
+        status:       'In Transit',
+        outgoingStatus: 'In Transit',
+        vehicleNumber: 'RJ-06-GB-2101',
         createdBy:    savedAdmin._id
       },
       {
-        shipmentId:   'SKRT-1002',
-        sender:       { name: 'Global Logistics', phone: '9811122334', address: 'Jaipur' },
-        receiver:     { name: 'Delhi Depot',      phone: '9711223344', address: 'Delhi' },
-        origin:       'Jaipur',
-        destination:  'Delhi',
-        weight:       1800,
+        consignmentNumber: 'SKRT-1002',
+        toBranch:          'Delhi',
+        consignor: {
+          gst:         '08AIMPG1878N1ZL',
+          name:        'Global Logistics',
+          phoneNumber: '9811122334',
+          state:       'Rajasthan',
+          city:        'Jaipur'
+        },
+        consignee: {
+          gst:         '07CCCCC3333C3Z3',
+          name:        'Delhi Depot',
+          phoneNumber: '9711223344',
+          state:       'Delhi',
+          city:        'Delhi'
+        },
+        invoiceValue: 350000,
+        description:  'Machine Parts',
+        quantity:     15,
+        packageType:  'Box',
+        privateNumber: 'P-5521',
+        actualWeight: 1800,
+        chargedWeight: 1800,
+        rateType:     'Kg',
         rate:         15,
-        totalFreight: 27000,
         paymentMode:  'ToPay',
-        status:       'booked',
+        totalFreight: 27000,
+        totalPayable: 27000,
+        status:       'Booked',
+        outgoingStatus: 'Pending',
         createdBy:    savedAdmin._id
       }
     ]);

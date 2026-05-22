@@ -39,15 +39,18 @@ export function Sidebar() {
   return (
     <aside className="w-64 h-screen bg-background border-r border-border flex flex-col fixed left-0 top-0 z-50">
       <div className="p-6">
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-          SKRT
-        </h1>
+        <Link href="/dashboard" className="block">
+          <h1 className="text-2xl font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent tracking-tight">
+            SKRT<span className="text-[10px] font-normal text-muted-foreground ml-1 tracking-widest uppercase align-middle">CORP</span>
+          </h1>
+        </Link>
       </div>
 
       <nav className="flex-1 px-4 space-y-2 mt-4">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || 
+            (item.href === "/inventory" && ["/inventory", "/challan", "/cash-memo", "/entry"].includes(pathname));
 
           return (
             <Link

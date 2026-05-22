@@ -10,11 +10,16 @@ import { Input } from "@/components/ui/input";
 
 import api from "@/lib/api";
 import { AddDriverDialog } from "@/components/drivers/AddDriverDialog";
+import { ViewProfileDialog } from "@/components/drivers/ViewProfileDialog";
+import { ManageTripsDialog } from "@/components/drivers/ManageTripsDialog";
 
 export default function DriversPage() {
   const [driverList, setDriverList] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [selectedDriver, setSelectedDriver] = React.useState<any>(null);
+  const [profileOpen, setProfileOpen] = React.useState(false);
+  const [tripsOpen, setTripsOpen] = React.useState(false);
 
   const fetchDrivers = async () => {
     try {
@@ -111,8 +116,28 @@ export default function DriversPage() {
                 </div>
                 
                 <div className="p-4 border-t border-border/50 bg-white/5 flex gap-2">
-                  <Button variant="ghost" size="sm" className="flex-1 text-xs">View Profile</Button>
-                  <Button variant="outline" size="sm" className="flex-1 text-xs">Manage Trips</Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="flex-1 text-xs"
+                    onClick={() => {
+                      setSelectedDriver(driver);
+                      setProfileOpen(true);
+                    }}
+                  >
+                    View Profile
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1 text-xs"
+                    onClick={() => {
+                      setSelectedDriver(driver);
+                      setTripsOpen(true);
+                    }}
+                  >
+                    Manage Trips
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -120,6 +145,18 @@ export default function DriversPage() {
           </div>
         )}
       </div>
+
+      <ViewProfileDialog 
+        open={profileOpen} 
+        onOpenChange={setProfileOpen} 
+        driver={selectedDriver} 
+      />
+
+      <ManageTripsDialog 
+        open={tripsOpen} 
+        onOpenChange={setTripsOpen} 
+        driver={selectedDriver} 
+      />
     </DashboardLayout>
   );
 }
