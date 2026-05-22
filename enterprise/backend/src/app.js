@@ -49,6 +49,10 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
+// Database Disconnected Mock Interceptor
+const mockDbMiddleware = require('./middleware/mockDbMiddleware');
+app.use('/api', mockDbMiddleware);
+
 // Basic Route
 app.get('/', (req, res) => {
   res.json({ message: 'SKRT Logistics API is running...' });

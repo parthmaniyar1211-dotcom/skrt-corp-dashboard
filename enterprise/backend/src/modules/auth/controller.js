@@ -13,6 +13,29 @@ exports.login = async (req, res) => {
   console.log('   Password received:', password ? '(provided)' : '(missing)');
 
   try {
+    const mongoose = require('mongoose');
+    const isDbConnected = mongoose.connection.readyState === 1;
+
+    if (!isDbConnected) {
+      console.log('⚠️ MongoDB is not connected. Attempting Mock Login bypass.');
+      if (email === 'admin@ttc.com' && password === 'password123') {
+        const mockUserId = new mongoose.Types.ObjectId();
+        const token = generateToken(mockUserId);
+        console.log('   JWT generated (Mock Mode): ✅ Yes');
+        console.log('────────────────────────────────────────────────────\n');
+        return sendResponse(res, 200, true, 'Login successful (Mock Mode)', {
+          _id:   mockUserId,
+          name:  'Administrator',
+          email: 'admin@ttc.com',
+          role:  'admin',
+          token
+        });
+      } else {
+        console.log('   ❌ Login failed (Mock Mode) — invalid credentials.');
+        return sendResponse(res, 401, false, 'Invalid email or password');
+      }
+    }
+
     // Step 1: Find user by email and explicitly include password field
     const user = await User.findOne({ email }).select('+password');
 
@@ -91,6 +114,18 @@ exports.register = async (req, res) => {
 // @access  Private
 exports.getProfile = async (req, res) => {
   try {
+    const mongoose = require('mongoose');
+    const isDbConnected = mongoose.connection.readyState === 1;
+
+    if (!isDbConnected) {
+      return sendResponse(res, 200, true, 'Profile fetched successfully (Mock Mode)', {
+        _id: req.user._id,
+        name: 'Administrator',
+        email: 'admin@ttc.com',
+        role: 'admin'
+      });
+    }
+
     const user = await User.findById(req.user._id);
 
     if (user) {

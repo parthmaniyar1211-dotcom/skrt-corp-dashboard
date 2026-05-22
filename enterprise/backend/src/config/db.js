@@ -7,8 +7,8 @@ const connectDB = async () => {
   const uri = process.env.MONGODB_URI;
   
   if (!uri) {
-    console.error('❌ MONGODB_URI is not defined in .env file');
-    process.exit(1);
+    console.warn('⚠️ MONGODB_URI is not defined in .env file. Running in database-disconnected mode.');
+    return;
   }
 
   try {
