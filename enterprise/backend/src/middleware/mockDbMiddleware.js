@@ -194,6 +194,81 @@ const mockStore = {
   notifications: [
     { _id: 'mock_not_1', title: 'New Shipment Booked', message: 'Shipment SKRT-1002 has been successfully booked.', type: 'info', read: false, createdAt: new Date().toISOString() },
     { _id: 'mock_not_2', title: 'Service Scheduled', message: 'Vehicle MH-12-Q-4567 scheduled for maintenance.', type: 'warning', read: false, createdAt: new Date().toISOString() }
+  ],
+  tracking: [
+    {
+      _id: 'mock_track_1',
+      consignmentNumber: 'SKRT-1001',
+      vehicleNumber: 'RJ-06-GB-2101',
+      driverName: 'Ramesh Singh',
+      driverPhone: '9876512345',
+      type: 'Truck',
+      status: 'active',
+      statusLabel: 'In Transit',
+      currentLocation: { 
+        lat: 25.3500, 
+        lng: 74.6330, 
+        address: 'Bhilwara Bypass, NH-48' 
+      },
+      lastUpdate: new Date().toISOString(),
+      distance: '180 km',
+      shipment: {
+        lrNo: 'SKRT-1001',
+        origin: 'Bhilwara',
+        destination: 'Ahmedabad',
+        sender: 'Aditya Textiles',
+        receiver: 'Gujarat Fabrics',
+        cargoType: 'Cotton Yarn Bales',
+        packages: 50,
+        weight: '2500 kg',
+        value: '₹45,000',
+        challanNo: 'CHL-982341'
+      },
+      trackingHistory: [
+        { id: '1', title: 'Vehicle Assigned', location: 'Bhilwara Depot', time: '09:00 AM', status: 'completed' },
+        { id: '2', title: 'Shipment Picked from Warehouse', location: 'Bhilwara Depot', time: '11:30 AM', status: 'completed' },
+        { id: '3', title: 'Dispatched', location: 'Bhilwara Bypass', time: '02:00 PM', status: 'completed' },
+        { id: '4', title: 'In Transit', location: 'NH-48, near Ajmer Toll', time: '05:30 PM', status: 'active' },
+        { id: '5', title: 'Reached Hub', location: 'Ahmedabad Hub', time: '-', status: 'pending' },
+        { id: '6', title: 'Delivered', location: 'Ahmedabad Depot', time: '-', status: 'pending' }
+      ]
+    },
+    {
+      _id: 'mock_track_2',
+      consignmentNumber: 'SKRT-1002',
+      vehicleNumber: 'RJ-06-GB-4421',
+      driverName: 'Suresh Kumar',
+      driverPhone: '9876512346',
+      type: 'Container',
+      status: 'idle',
+      statusLabel: 'Pending',
+      currentLocation: { 
+        lat: 26.9124, 
+        lng: 75.7873, 
+        address: 'Jaipur Depot' 
+      },
+      lastUpdate: new Date().toISOString(),
+      distance: 'Calculating...',
+      shipment: {
+        lrNo: 'SKRT-1002',
+        origin: 'Jaipur',
+        destination: 'Delhi',
+        sender: 'Global Logistics',
+        receiver: 'Delhi Depot',
+        cargoType: 'Machine Parts',
+        packages: 15,
+        weight: '1800 kg',
+        value: '₹27,000',
+        challanNo: 'CHL-982342'
+      },
+      trackingHistory: [
+        { id: '1', title: 'Vehicle Assigned', location: 'Jaipur Depot', time: '10:00 AM', status: 'completed' },
+        { id: '2', title: 'Shipment Picked from Warehouse', location: 'Jaipur Depot', time: '-', status: 'active' },
+        { id: '3', title: 'Dispatched', location: '-', time: '-', status: 'pending' },
+        { id: '4', title: 'In Transit', location: '-', time: '-', status: 'pending' },
+        { id: '5', title: 'Delivered', location: '-', time: '-', status: 'pending' }
+      ]
+    }
   ]
 };
 

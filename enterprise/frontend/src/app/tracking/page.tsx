@@ -127,14 +127,16 @@ export default function LiveTrackingPage() {
     fetchLock.current = true;
     try {
       const { data } = await api.get('/tracking');
-      if (data.success) {
-        setVehicles(data.data);
+      if (data && data.success) {
+        const dataList = Array.isArray(data.data) ? data.data : [];
+        setVehicles(dataList);
         const currentSelected = selectedVehicleRef.current;
-        if (data.data.length > 0 && !currentSelected) {
-          setSelectedVehicle(data.data[0]);
+        if (dataList.length > 0 && !currentSelected) {
+          setSelectedVehicle(dataList[0]);
         } else if (currentSelected) {
           // Keep selection synced by normalized vehicle number
-          const updated = data.data.find((v: any) => 
+          const updated = dataList.find((v: any) => 
+            v && v.vehicleNumber && currentSelected.vehicleNumber &&
             v.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === 
             currentSelected.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
           );
@@ -150,9 +152,12 @@ export default function LiveTrackingPage() {
             }
           }
         }
+      } else {
+        setVehicles([]);
       }
     } catch (error) {
       console.error('Failed to fetch tracking data', error);
+      setVehicles([]);
       // Only toast on manual refresh
       if (!isSilent) toast.error("Failed to refresh tracking data");
     } finally {
@@ -198,36 +203,47 @@ export default function LiveTrackingPage() {
   }, [fetchTrackingData]); // Run once and keep socket connection alive
 
   const stats = useMemo(() => {
+    const list = Array.isArray(vehicles) ? vehicles : [];
     return {
-      total: vehicles.length,
-      active: vehicles.filter(v => v.status === 'active').length,
-      idle: vehicles.filter(v => v.status === 'idle').length,
-      offline: vehicles.filter(v => v.status === 'offline').length
+      total: list.length,
+      active: list.filter(v => v && v.status === 'active').length,
+      idle: list.filter(v => v && v.status === 'idle').length,
+      offline: list.filter(v => v && v.status === 'offline').length
     };
   }, [vehicles]);
 
   const filteredVehicles = useMemo(() => {
-    return vehicles.filter(v => {
-      const matchesSearch = v.vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           v.consignmentNumber.toLowerCase().includes(searchTerm.toLowerCase());
+    const list = Array.isArray(vehicles) ? vehicles : [];
+    return list.filter(v => {
+      if (!v) return false;
+      const vNo = v.vehicleNumber || "";
+      const cNo = v.consignmentNumber || "";
+      const status = v.status || "";
+      const label = v.statusLabel || "";
+
+      const matchesSearch = vNo.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                           cNo.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'All' || 
-                           v.status.toLowerCase() === statusFilter.toLowerCase() ||
-                           v.statusLabel.toLowerCase() === statusFilter.toLowerCase();
+                           status.toLowerCase() === statusFilter.toLowerCase() ||
+                           label.toLowerCase() === statusFilter.toLowerCase();
       return matchesSearch && matchesStatus;
     });
   }, [vehicles, searchTerm, statusFilter]);
 
   const exportCSV = () => {
     const headers = ["Consignment No", "Vehicle No", "Status", "From", "To", "Driver", "Total Freight"];
-    const rows = filteredVehicles.map(v => [
-      v.consignmentNumber,
-      v.vehicleNumber,
-      v.statusLabel,
-      v.shipment.origin,
-      v.shipment.destination,
-      v.driverName,
-      v.shipment.value
-    ]);
+    const rows = (filteredVehicles || []).map(v => {
+      if (!v) return ["", "", "", "", "", "", ""];
+      return [
+        v.consignmentNumber || "",
+        v.vehicleNumber || "",
+        v.statusLabel || v.status || "",
+        v.shipment?.origin || "",
+        v.shipment?.destination || "",
+        v.driverName || "",
+        v.shipment?.value || ""
+      ];
+    });
 
     const csvContent = "data:text/csv;charset=utf-8," + 
       [headers, ...rows].map(e => e.join(",")).join("\n");
@@ -341,12 +357,12 @@ export default function LiveTrackingPage() {
                 </div>
               ) : (
                 filteredVehicles.map((v) => {
-                  const isSelected = selectedVehicle && 
+                  const isSelected = selectedVehicle && v?.vehicleNumber && selectedVehicle?.vehicleNumber &&
                     selectedVehicle.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === 
                     v.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
                   return (
                     <motion.div
-                      key={v._id}
+                      key={v?._id || Math.random().toString()}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => setSelectedVehicle(v)}
                       className={cn(
@@ -365,30 +381,30 @@ export default function LiveTrackingPage() {
                             <Truck className="w-4 h-4" />
                           </div>
                           <div>
-                            <p className="font-bold text-sm tracking-tight">{v.vehicleNumber}</p>
-                            <p className="text-[10px] text-muted-foreground uppercase font-medium">SHP: {v.consignmentNumber}</p>
+                            <p className="font-bold text-sm tracking-tight">{v?.vehicleNumber || "Unknown"}</p>
+                            <p className="text-[10px] text-muted-foreground uppercase font-medium">SHP: {v?.consignmentNumber || "N/A"}</p>
                           </div>
                         </div>
-                        <Badge className={cn("text-[10px] font-bold h-6 border uppercase", statusColors[v.statusLabel] || statusColors[v.status])}>
-                          {v.statusLabel}
+                        <Badge className={cn("text-[10px] font-bold h-6 border uppercase", statusColors[v?.statusLabel] || statusColors[v?.status || 'idle'])}>
+                          {v?.statusLabel || v?.status || "Idle"}
                         </Badge>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground mb-3">
                         <div className="flex items-center gap-1.5 truncate">
-                          <User className="w-3 h-3" /> {v.driverName}
+                          <User className="w-3 h-3" /> {v?.driverName || "Unknown"}
                         </div>
                         <div className="flex items-center gap-1.5 truncate">
-                          <Phone className="w-3 h-3" /> {v.driverPhone}
+                          <Phone className="w-3 h-3" /> {v?.driverPhone || "N/A"}
                         </div>
                       </div>
 
                       <div className="flex items-center justify-between text-[10px] pt-3 border-t border-border/30">
                         <div className="flex items-center gap-1.5 text-muted-foreground">
                           <MapPin className="w-3 h-3 text-emerald-500" />
-                          <span className="truncate max-w-[150px]">{v.currentLocation.address}</span>
+                          <span className="truncate max-w-[150px]">{v?.currentLocation?.address || "Unknown"}</span>
                         </div>
-                        <span className="text-muted-foreground/60">{new Date(v.lastUpdate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="text-muted-foreground/60">{v?.lastUpdate ? new Date(v.lastUpdate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "N/A"}</span>
                       </div>
                     </motion.div>
                   );
@@ -416,13 +432,13 @@ export default function LiveTrackingPage() {
                              </div>
                              <div className="space-y-1">
                                 <div className="flex items-center gap-3">
-                                   <h2 className="text-3xl font-extrabold tracking-tighter">{selectedVehicle.vehicleNumber}</h2>
-                                   <Badge className={cn("text-xs font-bold px-3 py-1 border uppercase", statusColors[selectedVehicle.statusLabel] || statusColors[selectedVehicle.status])}>
-                                      {selectedVehicle.statusLabel}
+                                   <h2 className="text-3xl font-extrabold tracking-tighter">{selectedVehicle?.vehicleNumber || "Unknown"}</h2>
+                                   <Badge className={cn("text-xs font-bold px-3 py-1 border uppercase", statusColors[selectedVehicle?.statusLabel] || statusColors[selectedVehicle?.status || 'idle'])}>
+                                      {selectedVehicle?.statusLabel || selectedVehicle?.status || "Idle"}
                                    </Badge>
                                 </div>
                                 <p className="text-sm font-medium text-muted-foreground">
-                                   {selectedVehicle.driverName} • {selectedVehicle.driverPhone}
+                                   {selectedVehicle?.driverName || "Unknown"} • {selectedVehicle?.driverPhone || "N/A"}
                                 </p>
                              </div>
                           </div>
@@ -430,29 +446,29 @@ export default function LiveTrackingPage() {
                           <div className="grid grid-cols-2 gap-x-8 gap-y-4 pt-2">
                              <div className="space-y-1">
                                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Shipment / LR No</p>
-                                <p className="text-sm font-bold">{selectedVehicle.consignmentNumber}</p>
+                                <p className="text-sm font-bold">{selectedVehicle?.consignmentNumber || "N/A"}</p>
                              </div>
                              <div className="space-y-1">
                                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">From</p>
-                                <p className="text-sm font-bold">{selectedVehicle.shipment.origin}</p>
+                                <p className="text-sm font-bold">{selectedVehicle?.shipment?.origin || "Warehouse"}</p>
                              </div>
                              <div className="space-y-1">
                                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">To</p>
-                                <p className="text-sm font-bold">{selectedVehicle.shipment.destination}</p>
+                                <p className="text-sm font-bold">{selectedVehicle?.shipment?.destination || "Destination"}</p>
                              </div>
                              <div className="space-y-1">
                                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Vehicle Type</p>
-                                <p className="text-sm font-bold">{selectedVehicle.type}</p>
+                                <p className="text-sm font-bold">{selectedVehicle?.type || "Transport Vehicle"}</p>
                              </div>
                              <div className="space-y-1">
                                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Current Location</p>
-                                <p className="text-sm font-bold text-emerald-400">{selectedVehicle.currentLocation.address}</p>
+                                <p className="text-sm font-bold text-emerald-400">{selectedVehicle?.currentLocation?.address || "Unknown"}</p>
                              </div>
                              <div className="space-y-1">
                                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Last Updated</p>
                                 <div className="flex items-center gap-1.5 text-sm font-bold">
                                    <Clock className="w-3.5 h-3.5 text-primary" />
-                                   {new Date(selectedVehicle.lastUpdate).toLocaleTimeString()}
+                                   {selectedVehicle?.lastUpdate ? new Date(selectedVehicle.lastUpdate).toLocaleTimeString() : "N/A"}
                                 </div>
                              </div>
                           </div>
@@ -460,9 +476,9 @@ export default function LiveTrackingPage() {
 
                        <div className="h-[240px] xl:h-auto overflow-hidden rounded-xl">
                           <RouteMapPreview 
-                             origin={selectedVehicle.shipment.origin} 
-                             destination={selectedVehicle.shipment.destination} 
-                             isDelivered={selectedVehicle.statusLabel === 'Delivered'} 
+                             origin={selectedVehicle?.shipment?.origin || "Warehouse"} 
+                             destination={selectedVehicle?.shipment?.destination || "Destination"} 
+                             isDelivered={selectedVehicle?.statusLabel === 'Delivered'} 
                           />
                        </div>
                     </div>
@@ -480,9 +496,9 @@ export default function LiveTrackingPage() {
                     <div className="relative pl-12 space-y-10">
                        <div className="absolute left-[23px] top-2 bottom-2 w-0.5 bg-border/40" />
                        
-                       {selectedVehicle.trackingHistory.map((step: any, index: number) => {
-                          const isCompleted = step.status === 'completed';
-                          const isActive = step.status === 'active';
+                       {(selectedVehicle?.trackingHistory || []).map((step: any, index: number) => {
+                          const isCompleted = step?.status === 'completed';
+                          const isActive = step?.status === 'active';
                           return (
                             <div key={index} className="relative group">
                                <div className={cn(
@@ -494,14 +510,14 @@ export default function LiveTrackingPage() {
                                <div className="flex justify-between items-center bg-secondary/5 group-hover:bg-secondary/10 p-4 rounded-2xl transition-colors border border-transparent group-hover:border-border/30">
                                   <div>
                                      <h4 className={cn("font-bold text-base", isCompleted ? "text-emerald-400" : isActive ? "text-primary" : "text-muted-foreground")}>
-                                        {step.title}
+                                        {step?.title || "Update"}
                                      </h4>
-                                     <p className="text-xs text-muted-foreground">{step.location}</p>
+                                     <p className="text-xs text-muted-foreground">{step?.location || "-"}</p>
                                   </div>
                                   <div className="text-right">
-                                     <p className="text-xs font-bold">{step.time}</p>
+                                     <p className="text-xs font-bold">{step?.time || "-"}</p>
                                      <Badge variant="outline" className={cn("text-[10px] px-2 h-5 flex-shrink-0 font-bold", isCompleted ? "border-emerald-500/30 text-emerald-500" : isActive ? "border-primary/30 text-primary" : "border-border/30 text-muted-foreground")}>
-                                        {step.status.toUpperCase()}
+                                        {(step?.status || "pending").toUpperCase()}
                                      </Badge>
                                   </div>
                                </div>
@@ -516,27 +532,27 @@ export default function LiveTrackingPage() {
                     <Card className="p-4 bg-card/60 border-border/40 text-center hover:bg-card/80 transition-colors">
                        <Box className="w-5 h-5 mx-auto mb-2 text-primary" />
                        <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">Cargo Type</p>
-                       <p className="text-xs font-bold mt-1 text-foreground">{selectedVehicle.shipment.cargoType}</p>
+                       <p className="text-xs font-bold mt-1 text-foreground">{selectedVehicle?.shipment?.cargoType || "Goods"}</p>
                     </Card>
                     <Card className="p-4 bg-card/60 border-border/40 text-center hover:bg-card/80 transition-colors">
                        <Package className="w-5 h-5 mx-auto mb-2 text-primary" />
                        <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">Packages</p>
-                       <p className="text-xs font-bold mt-1 text-foreground">{selectedVehicle.shipment.packages}</p>
+                       <p className="text-xs font-bold mt-1 text-foreground">{selectedVehicle?.shipment?.packages || 0}</p>
                     </Card>
                     <Card className="p-4 bg-card/60 border-border/40 text-center hover:bg-card/80 transition-colors">
                        <Scale className="w-5 h-5 mx-auto mb-2 text-primary" />
                        <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">Weight</p>
-                       <p className="text-xs font-bold mt-1 text-foreground">{selectedVehicle.shipment.weight}</p>
+                       <p className="text-xs font-bold mt-1 text-foreground">{selectedVehicle?.shipment?.weight || "0 kg"}</p>
                     </Card>
                     <Card className="p-4 bg-card/60 border-border/40 text-center hover:bg-card/80 transition-colors">
                        <IndianRupee className="w-5 h-5 mx-auto mb-2 text-primary" />
                        <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">Value</p>
-                       <p className="text-xs font-bold mt-1 text-foreground text-emerald-400">{selectedVehicle.shipment.value}</p>
+                       <p className="text-xs font-bold mt-1 text-foreground text-emerald-400">{selectedVehicle?.shipment?.value || "₹0"}</p>
                     </Card>
                     <Card className="p-4 bg-card/60 border-border/40 text-center hover:bg-card/80 transition-colors">
                        <FileText className="w-5 h-5 mx-auto mb-2 text-primary" />
                        <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">Challan No</p>
-                       <p className="text-xs font-bold mt-1 text-foreground">{selectedVehicle.shipment.challanNo}</p>
+                       <p className="text-xs font-bold mt-1 text-foreground">{selectedVehicle?.shipment?.challanNo || "N/A"}</p>
                     </Card>
                  </div>
                </>
