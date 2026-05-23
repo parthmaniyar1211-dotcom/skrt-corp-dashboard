@@ -47,7 +47,7 @@ const vendorsList = [
   "RTO Authority Office", "Highway Dhabha & Rest", "Surat Hub Maintenance"
 ];
 
-// 1. Clients (21 records)
+// 1. Clients (21 records) — totalShipments will be computed after shipments are defined
 export const clients: any[] = clientsList.map((c, i) => ({
   _id: `mock_cli_${i + 1}`,
   name: c.name,
@@ -85,6 +85,12 @@ export const vehicles: any[] = Array.from({ length: 21 }, (_, i) => {
 // 3. Drivers (22 records)
 export const drivers: any[] = driverNames.map((name, i) => {
   const assignedVehicle = vehicles[i % vehicles.length];
+  const origin1 = cities[i % cities.length];
+  const dest1 = cities[(i + 3) % cities.length];
+  const origin2 = cities[(i + 2) % cities.length];
+  const dest2 = cities[(i + 5) % cities.length];
+  const origin3 = cities[(i + 1) % cities.length];
+  const dest3 = cities[(i + 4) % cities.length];
   return {
     _id: `mock_drv_${i + 1}`,
     name,
@@ -101,8 +107,42 @@ export const drivers: any[] = driverNames.map((name, i) => {
       type: assignedVehicle.type
     },
     trips: [
-      { id: `t1_${i}`, route: `Bhilwara → Ahmedabad`, status: 'Completed', date: '2026-05-18' },
-      { id: `t2_${i}`, route: `${assignedVehicle.type} Routing`, status: 'Active', date: '2026-05-23' }
+      { 
+        id: `t1_${i}`, 
+        consignmentNumber: `SKRT-${1000 + (i * 2) % 40}`,
+        route: `${origin1} → ${dest1}`, 
+        cargoType: cargoTypes[i % cargoTypes.length],
+        vehicle: assignedVehicle.vehicleNo,
+        status: 'Completed', 
+        date: new Date(Date.now() - (i + 5) * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      },
+      { 
+        id: `t2_${i}`, 
+        consignmentNumber: `SKRT-${1000 + (i * 2 + 1) % 40}`,
+        route: `${origin2} → ${dest2}`,
+        cargoType: cargoTypes[(i + 3) % cargoTypes.length],
+        vehicle: assignedVehicle.vehicleNo,
+        status: i % 3 === 0 ? 'In Transit' : 'Completed', 
+        date: new Date(Date.now() - (i + 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      },
+      { 
+        id: `t3_${i}`, 
+        consignmentNumber: `SKRT-${1000 + (i * 3) % 40}`,
+        route: `${origin3} → ${dest3}`,
+        cargoType: cargoTypes[(i + 6) % cargoTypes.length],
+        vehicle: assignedVehicle.vehicleNo,
+        status: 'Completed', 
+        date: new Date(Date.now() - (i + 12) * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      },
+      { 
+        id: `t4_${i}`, 
+        consignmentNumber: `SKRT-${1010 + i % 30}`,
+        route: `${dest1} → ${origin3}`,
+        cargoType: cargoTypes[(i + 9) % cargoTypes.length],
+        vehicle: assignedVehicle.vehicleNo,
+        status: 'Delivered', 
+        date: new Date(Date.now() - (i + 18) * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      }
     ]
   };
 });

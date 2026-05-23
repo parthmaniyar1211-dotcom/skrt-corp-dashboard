@@ -176,35 +176,41 @@ export default function LiveTrackingPage() {
     fetchTrackingData();
     const interval = setInterval(() => fetchTrackingData(true), 30000);
 
-    // Establish dynamic WebSocket connection for instantaneous updates
-    const socketUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace("/api", "");
-    const socket = io(socketUrl, {
-      transports: ["websocket", "polling"],
-      reconnectionAttempts: 10,
-      reconnectionDelay: 2000,
-    });
+    // Only establish WebSocket on localhost where the backend server is running
+    // On Vercel/production, the virtual DB adapter handles all data — no socket needed
+    const isLocalhost = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    
+    let socket: any = null;
+    if (isLocalhost) {
+      const socketUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace("/api", "");
+      socket = io(socketUrl, {
+        transports: ["websocket", "polling"],
+        reconnectionAttempts: 10,
+        reconnectionDelay: 2000,
+      });
 
-    socket.on("connect", () => {
-      console.log("🔌 Connected to live tracking socket server");
-    });
+      socket.on("connect", () => {
+        console.log("🔌 Connected to live tracking socket server");
+      });
 
-    socket.on("connect_error", (error) => {
-      console.error("🔌 Live tracking socket connection error:", error);
-    });
+      socket.on("connect_error", (error: any) => {
+        console.error("🔌 Live tracking socket connection error:", error);
+      });
 
-    socket.on("shipment_updated", (data) => {
-      console.log("📦 Real-time update received:", data);
-      // Fetch instantly and silently to keep the live tracking completely updated
-      fetchTrackingData(true);
-    });
+      socket.on("shipment_updated", (data: any) => {
+        console.log("📦 Real-time update received:", data);
+        fetchTrackingData(true);
+      });
 
-    socket.on("disconnect", (reason) => {
-      console.log("🔌 Disconnected from live tracking socket server. Reason:", reason);
-    });
+      socket.on("disconnect", (reason: any) => {
+        console.log("🔌 Disconnected from live tracking socket server. Reason:", reason);
+      });
+    }
 
     return () => {
       clearInterval(interval);
-      socket.disconnect();
+      if (socket) socket.disconnect();
     };
   }, [fetchTrackingData]); // Run once and keep socket connection alive
 

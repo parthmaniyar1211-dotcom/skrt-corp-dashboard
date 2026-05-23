@@ -8,8 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { 
   Receipt, Plus, Filter, Download, Fuel, Wrench, CreditCard, 
-  User, Shield, FileText, Truck, Building, Disc, Info
+  User, Shield, FileText, Truck, Building
 } from "lucide-react";
+
 
 import api from "@/lib/api";
 import { AddExpenseDialog } from "@/components/expenses/AddExpenseDialog";

@@ -13,7 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Download, Printer, Filter, CreditCard, X } from "lucide-react";
+import { FileText, Download, Printer, Filter, CreditCard } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
   Dialog, 
@@ -184,9 +184,7 @@ This is a computer generated invoice and requires no signature.
     document.body.removeChild(link);
   };
 
-  React.useEffect(() => {
-    fetchInvoices();
-  }, []);
+
 
   const currentInvoices = invoiceList;
   
@@ -227,7 +225,7 @@ This is a computer generated invoice and requires no signature.
               variant="outline" 
               size="sm" 
               onClick={() => setShowFilters(!showFilters)}
-              className={cn("h-9 border-zinc-805 hover:bg-zinc-900 transition-all", showFilters && "bg-primary/20 border-primary/50 text-primary hover:bg-primary/30")}
+              className={cn("h-9 border-zinc-800 hover:bg-zinc-900 transition-all", showFilters && "bg-primary/20 border-primary/50 text-primary hover:bg-primary/30")}
             >
               <Filter className="w-4 h-4 mr-2" /> Filters
             </Button>
@@ -418,7 +416,7 @@ This is a computer generated invoice and requires no signature.
           </DialogHeader>
 
           <div className="py-6 space-y-4 text-sm">
-            <div className="flex justify-between items-center bg-zinc-900/50 p-3 border border-zinc-850 rounded-xl">
+            <div className="flex justify-between items-center bg-zinc-900/50 p-3 border border-zinc-800 rounded-xl">
               <span className="text-xs text-zinc-400">Status</span>
               <Badge variant="outline" className={cn(
                 "px-2.5 py-1 capitalize",
@@ -429,7 +427,7 @@ This is a computer generated invoice and requires no signature.
               </Badge>
             </div>
 
-            <div className="space-y-3 bg-zinc-900/30 border border-zinc-850 rounded-xl p-4">
+            <div className="space-y-3 bg-zinc-900/30 border border-zinc-800 rounded-xl p-4">
               <div className="flex justify-between">
                 <span className="text-zinc-500">Client Name</span>
                 <span className="text-zinc-200 font-semibold">{selectedInvoice?.client?.name}</span>
@@ -450,7 +448,7 @@ This is a computer generated invoice and requires no signature.
               </div>
             </div>
 
-            <div className="space-y-2 bg-zinc-900/40 border border-zinc-850 rounded-xl p-4">
+            <div className="space-y-2 bg-zinc-900/40 border border-zinc-800 rounded-xl p-4">
               <div className="flex justify-between text-xs text-zinc-500">
                 <span>Base Amount</span>
                 <span>₹{(selectedInvoice?.total / 1.18 || 0).toFixed(2)}</span>
@@ -473,7 +471,7 @@ This is a computer generated invoice and requires no signature.
                 setDetailsOpen(false);
                 handlePrintInvoice(selectedInvoice);
               }}
-              className="flex-1 bg-zinc-900 text-zinc-300 border-zinc-805 hover:bg-zinc-800"
+              className="flex-1 bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800"
             >
               <Printer className="w-4 h-4 mr-2" /> Print
             </Button>
@@ -483,7 +481,7 @@ This is a computer generated invoice and requires no signature.
                 setDetailsOpen(false);
                 handleDownloadInvoice(selectedInvoice);
               }}
-              className="flex-1 bg-zinc-900 text-zinc-300 border-zinc-805 hover:bg-zinc-800"
+              className="flex-1 bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800"
             >
               <Download className="w-4 h-4 mr-2" /> Download
             </Button>
@@ -506,10 +504,4 @@ export default function InvoicesPage() {
       <InvoicesPageContent />
     </Suspense>
   );
-}
-
-function Plus({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-  )
 }

@@ -7,7 +7,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area
 } from "recharts";
-import { TrendingUp, Users, Truck, Package, Download } from "lucide-react";
+import { Download } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import api from "@/lib/api";
 import { analytics as mockAnalytics } from "@/lib/mockData";

@@ -87,7 +87,8 @@ export default function DriversPage() {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {filteredDrivers.map((driver) => (
-              <Card key={driver._id} className="border-border/50 bg-secondary/10 overflow-hidden hover:shadow-xl hover:shadow-primary/5 transition-all group">
+              <Card key={driver._id || driver.id} className="border-border/50 bg-secondary/10 overflow-hidden hover:shadow-xl hover:shadow-primary/5 transition-all group">
+
                 <CardContent className="p-0">
                   <div className="p-6">
                     <div className="flex justify-between items-start mb-4">
