@@ -213,8 +213,8 @@ function InventoryPageContent() {
                   <TableHead className="text-center">Packages</TableHead>
                   <TableHead className="text-right">Weight</TableHead>
                   <TableHead>Incoming Status</TableHead>
+                  <TableHead>Date</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
-                  <TableHead className="text-right">Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -254,6 +254,9 @@ function InventoryPageContent() {
                             item.challanStatus === "Created" ? "text-emerald-400 font-medium" : "text-slate-400"
                           )}>{item.challanStatus || "Not Created"}</span></span>
                         </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap font-medium">
+                        {new Date(item.createdAt).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -304,9 +307,6 @@ function InventoryPageContent() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap text-right font-medium">
-                        {new Date(item.createdAt).toLocaleDateString()}
                       </TableCell>
                     </TableRow>
                   ))
