@@ -213,20 +213,20 @@ function InventoryPageContent() {
                   <TableHead className="text-center">Packages</TableHead>
                   <TableHead className="text-right">Weight</TableHead>
                   <TableHead>Incoming Status</TableHead>
-                  <TableHead>Date</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading && inventoryList.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
                       Loading inventory records...
                     </TableCell>
                   </TableRow>
                 ) : filteredInventory.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
                       No inventory records found.
                     </TableCell>
                   </TableRow>
@@ -247,10 +247,13 @@ function InventoryPageContent() {
                       <TableCell className="font-medium">{item.destination}</TableCell>
                       <TableCell className="text-center font-mono">{item.packages}</TableCell>
                       <TableCell className="text-right font-mono">{item.weight} kg</TableCell>
-                      <TableCell className="text-xs">{item.incomingStatus || "N/A"}</TableCell>
-                      <TableCell className="text-xs font-medium">{item.challanStatus}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(item.createdAt).toLocaleDateString()}
+                      <TableCell className="text-xs">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-foreground">{item.incomingStatus || "N/A"}</span>
+                          <span className="text-[10px] text-muted-foreground">Challan: <span className={cn(
+                            item.challanStatus === "Created" ? "text-emerald-400 font-medium" : "text-slate-400"
+                          )}>{item.challanStatus || "Not Created"}</span></span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -301,6 +304,9 @@ function InventoryPageContent() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap text-right font-medium">
+                        {new Date(item.createdAt).toLocaleDateString()}
                       </TableCell>
                     </TableRow>
                   ))
