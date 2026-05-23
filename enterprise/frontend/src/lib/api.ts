@@ -357,6 +357,20 @@ const handleVirtualDB = (config: any) => {
     };
   }
 
+  // 11. AUTH ENDPOINTS
+  else if (resource === "auth" && parts[1] === "login") {
+    responseData = {
+      success: true,
+      data: {
+        token: "mocked-jwt-token-12345",
+        _id: "mock_admin_1",
+        name: "Administrator",
+        email: parsedData.email || "admin@ttc.com",
+        role: "admin"
+      }
+    };
+  }
+
   return {
     data: responseData,
     status: 200,
