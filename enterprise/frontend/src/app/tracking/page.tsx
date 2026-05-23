@@ -83,14 +83,14 @@ const RouteMapPreview = ({ origin, destination, isDelivered }: { origin: string,
         <div className="flex-1 relative mx-4 flex items-center justify-center">
           <div className="absolute inset-0 flex items-center">
             <svg width="100%" height="40" className="overflow-visible">
-              <path 
-                d="M 0 20 Q 50% -20 100% 20" 
-                fill="none" 
-                stroke="#3b82f6" 
-                strokeWidth="3" 
-                strokeDasharray="6 6" 
-                className={isDelivered ? "" : "animate-[dash_3s_linear_infinite]"} 
-              />
+            <path 
+              d="M 0 20 Q 50 -20 100 20" 
+              fill="none" 
+              stroke="#3b82f6" 
+              strokeWidth="3" 
+              strokeDasharray="6 6" 
+              className={isDelivered ? "" : "animate-[dash_3s_linear_infinite]"} 
+            />
             </svg>
           </div>
         </div>

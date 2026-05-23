@@ -389,6 +389,11 @@ const handleVirtualDB = (config: any) => {
     };
   }
 
+  // 13. NOTIFICATIONS (prevent crash in virtual DB / mock mode)
+  else if (resource === "notifications") {
+    responseData = { success: true, data: [] };
+  }
+
   return {
     data: responseData,
     status: 200,

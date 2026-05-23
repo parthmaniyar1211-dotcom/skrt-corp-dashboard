@@ -31,10 +31,13 @@ export function NotificationBell() {
   const fetchNotifications = async () => {
     try {
       const res = await api.get('/notifications');
-      setNotifications(res.data.data);
-      setUnreadCount(res.data.data.filter((n: any) => !n.read).length);
+      const list = Array.isArray(res.data?.data) ? res.data.data : [];
+      setNotifications(list);
+      setUnreadCount(list.filter((n: any) => !n.read).length);
     } catch (error) {
       console.error("Failed to fetch notifications", error);
+      setNotifications([]);
+      setUnreadCount(0);
     }
   };
 

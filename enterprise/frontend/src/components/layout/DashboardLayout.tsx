@@ -51,9 +51,7 @@ export default function DashboardLayout({
         (item) =>
           item.inventoryId?.toLowerCase().includes(query) ||
           item.lrNo?.toLowerCase().includes(query) ||
-          item.cargoName?.toLowerCase().includes(query) ||
-          item.senderName?.toLowerCase().includes(query) ||
-          item.receiverName?.toLowerCase().includes(query)
+          item.cargoName?.toLowerCase().includes(query)
       ).slice(0, 5)
     : [];
 
