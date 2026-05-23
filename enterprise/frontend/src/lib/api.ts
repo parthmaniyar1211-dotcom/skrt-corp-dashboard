@@ -21,24 +21,29 @@ const api = axios.create({
   },
 });
 
-// Helper for localStorage virtual database
+// Helper for localStorage virtual database with try-catch safety net
 const getCollection = (key: string, initialData: any[]) => {
   if (typeof window === "undefined") return initialData;
-  const stored = localStorage.getItem(key);
-  if (!stored) {
-    localStorage.setItem(key, JSON.stringify(initialData));
-    return initialData;
-  }
   try {
+    const stored = localStorage.getItem(key);
+    if (!stored) {
+      localStorage.setItem(key, JSON.stringify(initialData));
+      return initialData;
+    }
     return JSON.parse(stored);
   } catch (e) {
+    console.warn("Storage warning: localStorage is blocked or insecure. Using memory fallback.", e);
     return initialData;
   }
 };
 
 const saveCollection = (key: string, data: any[]) => {
   if (typeof window !== "undefined") {
-    localStorage.setItem(key, JSON.stringify(data));
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+      console.warn("Storage warning: localStorage write blocked.", e);
+    }
   }
 };
 
@@ -371,6 +376,19 @@ const handleVirtualDB = (config: any) => {
     };
   }
 
+  // 12. AUTH PROFILE (session persistence on page refresh)
+  else if (resource === "auth" && parts[1] === "profile") {
+    responseData = {
+      success: true,
+      data: {
+        _id: "mock_admin_1",
+        name: "Administrator",
+        email: "admin@ttc.com",
+        role: "admin"
+      }
+    };
+  }
+
   return {
     data: responseData,
     status: 200,
@@ -392,14 +410,21 @@ const virtualDBAdapter = (config: any) => {
 api.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem("token");
+      let token = null;
+      try {
+        token = localStorage.getItem("token");
+      } catch (e) {}
+
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
       
       // Auto-pilot Virtual Database mode when hosted on Vercel (or when explicitly requested)
       const isVercel = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-      const forceDemo = localStorage.getItem("force_demo") === "true";
+      let forceDemo = false;
+      try {
+        forceDemo = localStorage.getItem("force_demo") === "true";
+      } catch (e) {}
       
       if (isVercel || forceDemo) {
         config.adapter = virtualDBAdapter as any;
