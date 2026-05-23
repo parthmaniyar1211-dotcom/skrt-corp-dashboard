@@ -1,306 +1,335 @@
 const mongoose = require('mongoose');
 
-// Mock Data Memory Store
+const clientsList = [
+  { name: 'Aditya Textiles', email: 'aditya@textiles.com', phone: '9876543210', address: 'Bhilwara', gstin: '08AIMPG1878N1ZL' },
+  { name: 'Gujarat Fabrics', email: 'gujarat@fabrics.com', phone: '9123456780', address: 'Ahmedabad', gstin: '24BBBBB2222B2Z2' },
+  { name: 'Jaipur Handicrafts', email: 'jaipur@handicrafts.com', phone: '9811122334', address: 'Jaipur', gstin: '08CCCCC3333C3Z3' },
+  { name: 'Delhi Retailers', email: 'delhi@retailers.com', phone: '9711223344', address: 'Delhi', gstin: '07DDDDD4444D4Z4' },
+  { name: 'Mumbai Auto Corp', email: 'mumbai@autocorp.com', phone: '9822334455', address: 'Mumbai', gstin: '27EEEEE5555E5Z5' },
+  { name: 'Pune Tooling Ltd', email: 'pune@tooling.com', phone: '9833445566', address: 'Pune', gstin: '27FFFFF6666F6Z6' },
+  { name: 'Surat Weaving Co', email: 'surat@weaving.com', phone: '9988776655', address: 'Surat', gstin: '24GGGGG7777G7Z7' },
+  { name: 'Indore Agro Mills', email: 'indore@agro.com', phone: '9844556677', address: 'Indore', gstin: '23HHHHH8888H8Z8' },
+  { name: 'Rajkot Castings', email: 'rajkot@castings.com', phone: '9855667788', address: 'Rajkot', gstin: '24IIIII9999I9Z9' },
+  { name: 'Reliance Industries', email: 'reliance@ril.com', phone: '9900112233', address: 'Surat', gstin: '24JJJJJ0000J0Z0' },
+  { name: 'Tata Motors', email: 'tata@motors.com', phone: '9911223344', address: 'Pune', gstin: '27KKKKK1111K1Z1' },
+  { name: 'L&T Heavy Engg', email: 'lt@heavy.com', phone: '9922334455', address: 'Mumbai', gstin: '27LLLLL2222L2Z2' },
+  { name: 'Vardhman Spinners', email: 'vardhman@spinners.com', phone: '9933445566', address: 'Bhilwara', gstin: '08MMMMM3333M3Z3' },
+  { name: 'Surat Silk Mills', email: 'silk@surat.com', phone: '9944556677', address: 'Surat', gstin: '24NNNNN4444N4Z4' },
+  { name: 'Indore Trading Co', email: 'trade@indore.com', phone: '9955667788', address: 'Indore', gstin: '23OOOOO5555O5Z5' },
+  { name: 'Ahmedabad Chemicals', email: 'chem@ahmedabad.com', phone: '9966778899', address: 'Ahmedabad', gstin: '24PPPPP6666P6Z6' }
+];
+
+const cities = ['Ahmedabad', 'Surat', 'Mumbai', 'Pune', 'Delhi', 'Jaipur', 'Indore', 'Rajkot', 'Bhilwara'];
+
+const cargoTypes = [
+  'Cotton Bales', 'Industrial Machinery', 'Textile Cartons', 'Steel Pipes', 'Electronics', 
+  'FMCG Goods', 'Ceramic Tiles', 'Polyester Yarn', 'Copper Wires', 'Chemical Drums', 
+  'Auto Parts', 'Garment Boxes', 'Plastic Raw Material', 'Paper Rolls', 'Agro Products'
+];
+
+const vehicleTypes = ['Truck', 'Container', 'Trailer', 'Van'];
+
+const driverNames = [
+  'Ramesh Singh', 'Suresh Kumar', 'Manoj Yadav', 'Rajesh Sharma', 'Amit Patel', 
+  'Vijay Rathore', 'Dinesh Choudhary', 'Sunil Verma', 'Sanjay Mishra', 'Anil Gupta', 
+  'Vikram Jhala', 'Satish Nehra', 'Mahendra Singh', 'Harpreet Singh', 'Gurpreet Singh', 
+  'Baldev Raj'
+];
+
+// 1. Clients (16)
+const clients = clientsList.map((c, i) => ({
+  _id: `mock_cli_${i + 1}`,
+  name: c.name,
+  email: c.email,
+  phone: c.phone,
+  address: c.address,
+  gstin: c.gstin,
+  status: 'active',
+  createdAt: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString()
+}));
+
+// 2. Vehicles (16)
+const vehicles = Array.from({ length: 16 }, (_, i) => {
+  const states = ['GJ', 'MH', 'RJ', 'DL', 'MP'];
+  const state = states[i % states.length];
+  const code = String((i * 3 + 1) % 90).padStart(2, '0');
+  const series = 'AB';
+  const num = String(1000 + i).slice(1);
+  const vehicleNo = `${state}-${code}-${series}-${num}`;
+  const type = vehicleTypes[i % vehicleTypes.length];
+  const capacities = { Truck: 25000, Container: 18000, Trailer: 35000, Van: 5000 };
+  return {
+    _id: `mock_veh_${i + 1}`,
+    vehicleNo,
+    type,
+    capacity: capacities[type],
+    status: i % 5 === 0 ? 'maintenance' : i % 3 === 0 ? 'on-trip' : 'available',
+    model: `${type === 'Truck' ? 'Tata' : type === 'Container' ? 'Mahindra' : type === 'Trailer' ? 'Ashok Leyland' : 'Eicher'} ${2020 + (i % 6)}`,
+    owner: { name: 'SKRT Logistics Ltd', phone: '9898989898' },
+    lastServiceDate: new Date(Date.now() - (i * 5 + 10) * 24 * 60 * 60 * 1000).toISOString(),
+    insuranceExpiry: new Date(Date.now() + (i * 15 + 30) * 24 * 60 * 60 * 1000).toISOString()
+  };
+});
+
+// 3. Drivers (16)
+const drivers = driverNames.map((name, i) => ({
+  _id: `mock_drv_${i + 1}`,
+  name,
+  phone: `98765${String(10000 + i).slice(1)}`,
+  license: `DL-${String(1000000000 + i).slice(1)}`,
+  status: i % 3 === 0 ? 'busy' : 'available',
+  experience: 3 + (i % 15),
+  rating: Number((4.0 + (i % 10) * 0.1).toFixed(1)),
+  email: `${name.toLowerCase().replace(' ', '.')}@skrt.com`,
+  role: 'driver'
+}));
+
+// 4. Inventory (30 records)
+const inventory = Array.from({ length: 30 }, (_, i) => {
+  const sender = clientsList[i % clientsList.length];
+  const receiver = clientsList[(i + 3) % clientsList.length];
+  const origin = cities[i % cities.length];
+  const destination = cities[(i + 4) % cities.length];
+  const cargoName = cargoTypes[i % cargoTypes.length];
+  const packages = 10 + (i * 4);
+  const weight = packages * 50;
+  const rate = 10 + (i % 15);
+  const totalFreight = weight * rate;
+  const paymentMode = ['To Pay', 'Paid', 'Credit'][i % 3];
+  const incomingStatus = ['Pending', 'Received', 'Arrived at Warehouse', 'Checked In'][i % 4];
+  const status = i % 3 === 0 ? 'Outgoing' : i % 3 === 1 ? 'Incoming' : 'In Inventory';
+  const challanStatus = i % 2 === 0 ? 'Created' : 'Not Created';
+  
+  let challanData = null;
+  if (challanStatus === 'Created') {
+    const assignedVehicle = vehicles[i % vehicles.length];
+    const assignedDriver = drivers[i % drivers.length];
+    challanData = {
+      challanNo: `CH-2026-${String(100 + i)}`,
+      vehicleNumber: assignedVehicle.vehicleNo,
+      driverName: assignedDriver.name,
+      driverPhone: assignedDriver.phone,
+      fromLocation: origin,
+      toLocation: destination,
+      dispatchDate: new Date(Date.now() - (i % 5) * 24 * 60 * 60 * 1000).toISOString(),
+      packages,
+      weight,
+      remarks: 'Direct Warehouse Dispatch'
+    };
+  }
+
+  return {
+    _id: `mock_inv_${i + 1}`,
+    inventoryId: `INV00${1000 + i}`,
+    lrNo: `LR982${340 + i}`,
+    cargoName,
+    senderName: sender.name,
+    senderPhone: sender.phone,
+    receiverName: receiver.name,
+    receiverPhone: receiver.phone,
+    origin,
+    destination,
+    packages,
+    weight,
+    rate,
+    totalFreight,
+    paymentMode,
+    warehouseLocation: `Bay ${1 + (i % 6)}, ${origin} Depot`,
+    incomingStatus,
+    outgoingStatus: challanStatus === 'Created' ? 'Dispatched' : 'Pending',
+    status,
+    challanStatus,
+    challanData,
+    remarks: 'Handle carefully',
+    createdAt: new Date(Date.now() - i * 12 * 60 * 60 * 1000).toISOString()
+  };
+});
+
+// 5. Shipments (30 records)
+const shipments = Array.from({ length: 30 }, (_, i) => {
+  const sender = clientsList[i % clientsList.length];
+  const receiver = clientsList[(i + 5) % clientsList.length];
+  const origin = cities[i % cities.length];
+  const destination = cities[(i + 3) % cities.length];
+  const cargoName = cargoTypes[i % cargoTypes.length];
+  const qty = 20 + (i * 3);
+  const weight = qty * 45;
+  const rate = 12 + (i % 12);
+  const totalFreight = weight * rate;
+  const assignedVehicle = vehicles[i % vehicles.length];
+  
+  return {
+    _id: `mock_ship_${i + 1}`,
+    consignmentNumber: `SKRT-${1000 + i}`,
+    toBranch: destination,
+    consignor: {
+      gst: sender.gstin,
+      name: sender.name,
+      phoneNumber: sender.phone,
+      state: origin === 'Bhilwara' || origin === 'Jaipur' ? 'Rajasthan' : origin === 'Ahmedabad' || origin === 'Surat' || origin === 'Rajkot' ? 'Gujarat' : origin === 'Mumbai' || origin === 'Pune' ? 'Maharashtra' : origin === 'Delhi' ? 'Delhi' : 'Madhya Pradesh',
+      city: origin
+    },
+    consignee: {
+      gst: receiver.gstin,
+      name: receiver.name,
+      phoneNumber: receiver.phone,
+      state: destination === 'Bhilwara' || destination === 'Jaipur' ? 'Rajasthan' : destination === 'Ahmedabad' || destination === 'Surat' || destination === 'Rajkot' ? 'Gujarat' : destination === 'Mumbai' || destination === 'Pune' ? 'Maharashtra' : destination === 'Delhi' ? 'Delhi' : 'Madhya Pradesh',
+      city: destination
+    },
+    invoiceValue: totalFreight * 10,
+    description: cargoName,
+    quantity: qty,
+    packageType: ['Bale', 'Box', 'Carton', 'Roll', 'Drum'][i % 5],
+    privateNumber: `P-${4000 + i}`,
+    actualWeight: weight,
+    chargedWeight: weight,
+    rateType: 'Kg',
+    rate,
+    paymentMode: ['Paid', 'ToPay', 'Credit'][i % 3],
+    totalFreight,
+    totalPayable: totalFreight,
+    status: i % 4 === 0 ? 'Delivered' : i % 3 === 0 ? 'Booked' : 'In Transit',
+    outgoingStatus: i % 4 === 0 ? 'Delivered' : i % 3 === 0 ? 'Pending' : 'In Transit',
+    vehicleNumber: assignedVehicle.vehicleNo,
+    createdAt: new Date(Date.now() - i * 18 * 60 * 60 * 1000).toISOString()
+  };
+});
+
+// 6. Invoices (30 records)
+const invoices = shipments.map((s, i) => {
+  const tax = Math.round(s.totalFreight * 0.18);
+  const total = s.totalFreight + tax;
+  return {
+    _id: `mock_invc_${i + 1}`,
+    invoiceNo: `INV-${String(100 + i)}`,
+    shipment: { _id: s._id, consignmentNumber: s.consignmentNumber },
+    client: { name: s.consignor.name, email: `${s.consignor.name.toLowerCase().replace(/ /g, '')}@gmail.com`, phone: s.consignor.phoneNumber },
+    amount: s.totalFreight,
+    tax,
+    total,
+    status: i % 4 === 0 ? 'cancelled' : i % 2 === 0 ? 'paid' : 'unpaid',
+    dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+    paidDate: i % 2 === 0 ? new Date(Date.now() - (i % 5) * 24 * 60 * 60 * 1000).toISOString() : null,
+    createdAt: s.createdAt
+  };
+});
+
+// 7. Expenses (30 records)
+const expenses = Array.from({ length: 30 }, (_, i) => {
+  const assignedVehicle = vehicles[i % vehicles.length];
+  const category = ['Fuel', 'Maintenance', 'Toll', 'Driver Payment', 'Other'][i % 5];
+  const amounts = { Fuel: 12000, Maintenance: 8500, Toll: 1800, 'Driver Payment': 5000, Other: 1500 };
+  const amount = amounts[category] + (i * 100);
+  return {
+    _id: `mock_exp_${i + 1}`,
+    category,
+    amount,
+    description: `${category} for ${assignedVehicle.vehicleNo} at toll/station #${i + 1}`,
+    date: new Date(Date.now() - (i * 8) * 60 * 60 * 1000).toISOString(),
+    vehicle: { _id: assignedVehicle._id, vehicleNo: assignedVehicle.vehicleNo },
+    status: i % 4 === 0 ? 'pending' : 'paid',
+    createdAt: new Date(Date.now() - (i * 8) * 60 * 60 * 1000).toISOString()
+  };
+});
+
+// 8. Live Tracking (12 records)
+const tracking = shipments.filter(s => s.status === 'In Transit').slice(0, 12).map((s, i) => {
+  const assignedVehicle = vehicles[i % vehicles.length];
+  const assignedDriver = drivers[i % drivers.length];
+  const baseLat = 22.3072 + (i * 0.2);
+  const baseLng = 73.1812 - (i * 0.1);
+  
+  return {
+    _id: `mock_track_${i + 1}`,
+    consignmentNumber: s.consignmentNumber,
+    vehicleNumber: assignedVehicle.vehicleNo,
+    driverName: assignedDriver.name,
+    driverPhone: assignedDriver.phone,
+    type: assignedVehicle.type,
+    status: 'active',
+    statusLabel: 'In Transit',
+    currentLocation: {
+      lat: baseLat,
+      lng: baseLng,
+      address: `NH-48 Corridor, Point #${i + 1}`
+    },
+    lastUpdate: new Date().toISOString(),
+    distance: `${120 + (i * 45)} km`,
+    shipment: {
+      lrNo: s.consignmentNumber,
+      origin: s.consignor.city,
+      destination: s.consignee.city,
+      sender: s.consignor.name,
+      receiver: s.consignee.name,
+      cargoType: s.description,
+      packages: s.quantity,
+      weight: `${s.actualWeight} kg`,
+      value: `₹${s.invoiceValue.toLocaleString()}`,
+      challanNo: `CHL-${4000 + i}`
+    },
+    trackingHistory: [
+      { id: '1', title: 'Vehicle Assigned', location: `${s.consignor.city} Depot`, time: '08:00 AM', status: 'completed' },
+      { id: '2', title: 'Shipment Loaded', location: `${s.consignor.city} Warehouse`, time: '10:30 AM', status: 'completed' },
+      { id: '3', title: 'Dispatched', location: `${s.consignor.city} Bypass`, time: '01:00 PM', status: 'completed' },
+      { id: '4', title: 'In Transit', location: 'NH-48 Highway', time: '04:30 PM', status: 'active' },
+      { id: '5', title: 'Reached Destination Hub', location: `${s.consignee.city} Hub`, time: '-', status: 'pending' }
+    ]
+  };
+});
+
+// Notifications
+const notifications = [
+  { _id: 'mock_not_1', title: 'New Shipment Booked', message: 'Shipment SKRT-1002 has been successfully booked.', type: 'info', read: false, createdAt: new Date().toISOString() },
+  { _id: 'mock_not_2', title: 'Service Scheduled', message: 'Vehicle MH-12-Q-4567 scheduled for maintenance.', type: 'warning', read: false, createdAt: new Date().toISOString() }
+];
+
 const mockStore = {
-  vehicles: [
-    { _id: 'mock_veh_1', vehicleNo: 'RJ-06-GB-2101', type: 'Truck', capacity: 25000, status: 'available' },
-    { _id: 'mock_veh_2', vehicleNo: 'RJ-06-GB-4421', type: 'Container', capacity: 18000, status: 'available' },
-    { _id: 'mock_veh_3', vehicleNo: 'MH-12-Q-4567', type: 'Trailer', capacity: 35000, status: 'in-service' }
-  ],
-  drivers: [
-    { _id: 'mock_drv_1', name: 'Ramesh Singh', phone: '9876512345', license: 'DL-1234567890', status: 'available', experience: 8, rating: 4.8 },
-    { _id: 'mock_drv_2', name: 'Suresh Kumar', phone: '9876512346', license: 'DL-1234567891', status: 'busy', experience: 5, rating: 4.5 }
-  ],
-  clients: [
-    { _id: 'mock_cli_1', name: 'Aditya Textiles', email: 'aditya@textiles.com', phone: '9876543210', address: 'Bhilwara', status: 'active' },
-    { _id: 'mock_cli_2', name: 'Gujarat Fabrics', email: 'gujarat@fabrics.com', phone: '9123456780', address: 'Ahmedabad', status: 'active' },
-    { _id: 'mock_cli_3', name: 'Global Logistics', email: 'global@logistics.com', phone: '9811122334', address: 'Jaipur', status: 'active' }
-  ],
-  inventory: [
-    {
-      _id: 'mock_inv_1',
-      inventoryId: 'INV001001',
-      lrNo: 'LR982341',
-      cargoName: 'Cotton Bales (Grade A)',
-      senderName: 'Aditya Spinners Ltd',
-      senderPhone: '9876543210',
-      receiverName: 'Gujarat Textile Mills',
-      receiverPhone: '9876543211',
-      origin: 'Bhilwara',
-      destination: 'Ahmedabad',
-      packages: 50,
-      weight: 2500,
-      rate: 18,
-      totalFreight: 45000,
-      paymentMode: 'To Pay',
-      warehouseLocation: 'Bay 4, Bhilwara Hub',
-      incomingStatus: 'Checked In',
-      outgoingStatus: 'Pending',
-      status: 'In Inventory',
-      challanStatus: 'Not Created',
-      remarks: 'Handle with care - Keep dry',
-      createdAt: new Date().toISOString()
-    },
-    {
-      _id: 'mock_inv_2',
-      inventoryId: 'INV001002',
-      lrNo: 'LR982342',
-      cargoName: 'Industrial Machinery Spares',
-      senderName: 'L&T Heavy Engg',
-      senderPhone: '9123456789',
-      receiverName: 'Tata Motors Assembly',
-      receiverPhone: '9123456790',
-      origin: 'Mumbai',
-      destination: 'Pune',
-      packages: 12,
-      weight: 1200,
-      rate: 25,
-      totalFreight: 30000,
-      paymentMode: 'Paid',
-      warehouseLocation: 'Heavy Cargo Bay, Mumbai',
-      incomingStatus: 'Checked In',
-      outgoingStatus: 'Dispatched',
-      status: 'Outgoing',
-      challanStatus: 'Created',
-      challanData: {
-        challanNo: 'CH-2026-001',
-        vehicleNumber: 'MH-12-Q-4567',
-        driverName: 'Ramesh Singh',
-        driverPhone: '9876512345',
-        fromLocation: 'Mumbai Hub',
-        toLocation: 'Pune Assembly Hub',
-        dispatchDate: new Date().toISOString(),
-        packages: 12,
-        weight: 1200,
-        remarks: 'Urgent Delivery'
-      },
-      remarks: 'Fragile precision parts',
-      createdAt: new Date().toISOString()
-    },
-    {
-      _id: 'mock_inv_3',
-      inventoryId: 'INV001003',
-      lrNo: 'LR982343',
-      cargoName: 'Polyester Yarn Cartons',
-      senderName: 'Reliance Industries',
-      senderPhone: '9988776655',
-      receiverName: 'Surat Weaving Co',
-      receiverPhone: '9988776656',
-      origin: 'Surat',
-      destination: 'Bhilwara',
-      packages: 100,
-      weight: 4000,
-      rate: 15,
-      totalFreight: 60000,
-      paymentMode: 'Credit',
-      warehouseLocation: 'Bay 2, Surat Depot',
-      incomingStatus: 'Arrived at Warehouse',
-      outgoingStatus: 'Pending',
-      status: 'Incoming',
-      challanStatus: 'Not Created',
-      remarks: 'Standard transit',
-      createdAt: new Date().toISOString()
-    }
-  ],
-  shipments: [
-    {
-      _id: 'mock_ship_1',
-      consignmentNumber: 'SKRT-1001',
-      toBranch: 'Ahmedabad',
-      consignor: {
-        gst: '08AIMPG1878N1ZL',
-        name: 'Aditya Textiles',
-        phoneNumber: '9876543210',
-        state: 'Rajasthan',
-        city: 'Bhilwara'
-      },
-      consignee: {
-        gst: '24BBBBB2222B2Z2',
-        name: 'Gujarat Fabrics',
-        phoneNumber: '9123456780',
-        state: 'Gujarat',
-        city: 'Ahmedabad'
-      },
-      invoiceValue: 500000,
-      description: 'Cotton Yarn Bales',
-      quantity: 50,
-      packageType: 'Bale',
-      privateNumber: 'P-9874',
-      actualWeight: 2500,
-      chargedWeight: 2500,
-      rateType: 'Kg',
-      rate: 18,
-      paymentMode: 'Paid',
-      totalFreight: 45000,
-      totalPayable: 45000,
-      status: 'In Transit',
-      outgoingStatus: 'In Transit',
-      vehicleNumber: 'RJ-06-GB-2101',
-      createdAt: new Date().toISOString()
-    },
-    {
-      _id: 'mock_ship_2',
-      consignmentNumber: 'SKRT-1002',
-      toBranch: 'Delhi',
-      consignor: {
-        gst: '08AIMPG1878N1ZL',
-        name: 'Global Logistics',
-        phoneNumber: '9811122334',
-        state: 'Rajasthan',
-        city: 'Jaipur'
-      },
-      consignee: {
-        gst: '07CCCCC3333C3Z3',
-        name: 'Delhi Depot',
-        phoneNumber: '9711223344',
-        state: 'Delhi',
-        city: 'Delhi'
-      },
-      invoiceValue: 350000,
-      description: 'Machine Parts',
-      quantity: 15,
-      packageType: 'Box',
-      privateNumber: 'P-5521',
-      actualWeight: 1800,
-      chargedWeight: 1800,
-      rateType: 'Kg',
-      rate: 15,
-      paymentMode: 'ToPay',
-      totalFreight: 27000,
-      totalPayable: 27000,
-      status: 'Booked',
-      outgoingStatus: 'Pending',
-      createdAt: new Date().toISOString()
-    }
-  ],
-  invoices: [
-    {
-      _id: 'mock_invc_1',
-      invoiceNo: 'INV-001',
-      shipment: { _id: 'mock_ship_1', consignmentNumber: 'SKRT-1001' },
-      client: { name: 'Aditya Textiles', email: 'aditya@textiles.com', phone: '9876543210' },
-      amount: 45000,
-      tax: 0,
-      total: 45000,
-      status: 'paid',
-      paidDate: new Date().toISOString(),
-      createdAt: new Date().toISOString()
-    }
-  ],
-  expenses: [
-    { _id: 'mock_exp_1', type: 'Fuel', amount: 15000, description: 'Fuel RJ-06-GB-2101', date: new Date().toISOString(), status: 'Paid', createdAt: new Date().toISOString() },
-    { _id: 'mock_exp_2', type: 'Toll', amount: 2500, description: 'Toll NH-48', date: new Date().toISOString(), status: 'Paid', createdAt: new Date().toISOString() }
-  ],
-  notifications: [
-    { _id: 'mock_not_1', title: 'New Shipment Booked', message: 'Shipment SKRT-1002 has been successfully booked.', type: 'info', read: false, createdAt: new Date().toISOString() },
-    { _id: 'mock_not_2', title: 'Service Scheduled', message: 'Vehicle MH-12-Q-4567 scheduled for maintenance.', type: 'warning', read: false, createdAt: new Date().toISOString() }
-  ],
-  tracking: [
-    {
-      _id: 'mock_track_1',
-      consignmentNumber: 'SKRT-1001',
-      vehicleNumber: 'RJ-06-GB-2101',
-      driverName: 'Ramesh Singh',
-      driverPhone: '9876512345',
-      type: 'Truck',
-      status: 'active',
-      statusLabel: 'In Transit',
-      currentLocation: { 
-        lat: 25.3500, 
-        lng: 74.6330, 
-        address: 'Bhilwara Bypass, NH-48' 
-      },
-      lastUpdate: new Date().toISOString(),
-      distance: '180 km',
-      shipment: {
-        lrNo: 'SKRT-1001',
-        origin: 'Bhilwara',
-        destination: 'Ahmedabad',
-        sender: 'Aditya Textiles',
-        receiver: 'Gujarat Fabrics',
-        cargoType: 'Cotton Yarn Bales',
-        packages: 50,
-        weight: '2500 kg',
-        value: '₹45,000',
-        challanNo: 'CHL-982341'
-      },
-      trackingHistory: [
-        { id: '1', title: 'Vehicle Assigned', location: 'Bhilwara Depot', time: '09:00 AM', status: 'completed' },
-        { id: '2', title: 'Shipment Picked from Warehouse', location: 'Bhilwara Depot', time: '11:30 AM', status: 'completed' },
-        { id: '3', title: 'Dispatched', location: 'Bhilwara Bypass', time: '02:00 PM', status: 'completed' },
-        { id: '4', title: 'In Transit', location: 'NH-48, near Ajmer Toll', time: '05:30 PM', status: 'active' },
-        { id: '5', title: 'Reached Hub', location: 'Ahmedabad Hub', time: '-', status: 'pending' },
-        { id: '6', title: 'Delivered', location: 'Ahmedabad Depot', time: '-', status: 'pending' }
-      ]
-    },
-    {
-      _id: 'mock_track_2',
-      consignmentNumber: 'SKRT-1002',
-      vehicleNumber: 'RJ-06-GB-4421',
-      driverName: 'Suresh Kumar',
-      driverPhone: '9876512346',
-      type: 'Container',
-      status: 'idle',
-      statusLabel: 'Pending',
-      currentLocation: { 
-        lat: 26.9124, 
-        lng: 75.7873, 
-        address: 'Jaipur Depot' 
-      },
-      lastUpdate: new Date().toISOString(),
-      distance: 'Calculating...',
-      shipment: {
-        lrNo: 'SKRT-1002',
-        origin: 'Jaipur',
-        destination: 'Delhi',
-        sender: 'Global Logistics',
-        receiver: 'Delhi Depot',
-        cargoType: 'Machine Parts',
-        packages: 15,
-        weight: '1800 kg',
-        value: '₹27,000',
-        challanNo: 'CHL-982342'
-      },
-      trackingHistory: [
-        { id: '1', title: 'Vehicle Assigned', location: 'Jaipur Depot', time: '10:00 AM', status: 'completed' },
-        { id: '2', title: 'Shipment Picked from Warehouse', location: 'Jaipur Depot', time: '-', status: 'active' },
-        { id: '3', title: 'Dispatched', location: '-', time: '-', status: 'pending' },
-        { id: '4', title: 'In Transit', location: '-', time: '-', status: 'pending' },
-        { id: '5', title: 'Delivered', location: '-', time: '-', status: 'pending' }
-      ]
-    }
-  ]
+  vehicles,
+  drivers,
+  clients,
+  inventory,
+  shipments,
+  invoices,
+  expenses,
+  notifications,
+  tracking
 };
 
 // Analytics Mock Responses
+const totalPaidRevenue = invoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + inv.total, 0);
+const activeShipmentCount = shipments.filter(s => s.status === 'In Transit').length;
+
 const mockAnalytics = {
   dashboard: {
     stats: {
-      activeShipments: 2,
-      totalShipments: 12,
-      monthlyRevenue: 72000,
-      fleetUtilization: 66.7
+      activeShipments: activeShipmentCount,
+      totalShipments: shipments.length,
+      monthlyRevenue: totalPaidRevenue,
+      fleetUtilization: 84.5
     },
-    revenueCosts: [
-      { month: 'Jan', revenue: 50000, cost: 35000 },
-      { month: 'Feb', revenue: 60000, cost: 42000 },
-      { month: 'Mar', revenue: 55000, cost: 38000 },
-      { month: 'Apr', revenue: 70000, cost: 48000 },
-      { month: 'May', revenue: 72000, cost: 49000 }
-    ],
+    revenueCosts: Array.from({ length: 5 }, (_, i) => {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May'];
+      const baseRev = 240000 + (i * 55000);
+      return {
+        month: months[i],
+        revenue: baseRev,
+        cost: Math.round(baseRev * 0.72)
+      };
+    }),
     topRoutes: [
-      { route: 'Bhilwara - Ahmedabad', shipments: 24, revenue: 432000 },
-      { route: 'Jaipur - Delhi', shipments: 18, revenue: 270000 },
-      { route: 'Mumbai - Pune', shipments: 15, revenue: 225000 }
+      { route: 'Bhilwara - Ahmedabad', shipments: 35, revenue: 560000 },
+      { route: 'Jaipur - Delhi', shipments: 28, revenue: 420000 },
+      { route: 'Mumbai - Pune', shipments: 22, revenue: 310000 },
+      { route: 'Surat - Bhilwara', shipments: 18, revenue: 270000 }
     ],
     vehicleUtilization: [
-      { date: 'May 18', rate: 75 },
-      { date: 'May 19', rate: 80 },
-      { date: 'May 20', rate: 85 },
+      { date: 'May 18', rate: 78 },
+      { date: 'May 19', rate: 82 },
+      { date: 'May 20', rate: 88 },
       { date: 'May 21', rate: 85 },
-      { date: 'May 22', rate: 90 }
+      { date: 'May 22', rate: 92 }
     ],
-    deliverySuccess: 98.4
+    deliverySuccess: 98.7
   }
 };
 
@@ -356,7 +385,7 @@ const mockDbMiddleware = (req, res, next) => {
       if (item) {
         return res.json({ success: true, data: item });
       }
-      return res.status(404).json({ success: false, message: 'Resource not found in Mock Store' });
+      return res.status(440).json({ success: false, message: 'Resource not found in Mock Store' });
     }
     return res.json({ success: true, data: store });
   }
