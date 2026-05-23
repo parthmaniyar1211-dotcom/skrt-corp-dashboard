@@ -127,31 +127,75 @@ export default function LiveTrackingPage() {
     if (!isSilent) setLoading(true);
     fetchLock.current = true;
     try {
-      const { data } = await api.get('/tracking');
-      let dataList = [];
-      if (data && data.success && Array.isArray(data.data) && data.data.length >= 3) {
-        dataList = data.data;
+      // Fetch tracking + shipments in parallel to merge outgoingStatus
+      const [trackingRes, shipmentsRes] = await Promise.allSettled([
+        api.get('/tracking'),
+        api.get('/shipments')
+      ]);
+
+      let dataList: any[] = [];
+      if (
+        trackingRes.status === 'fulfilled' &&
+        trackingRes.value.data?.success &&
+        Array.isArray(trackingRes.value.data.data) &&
+        trackingRes.value.data.data.length >= 3
+      ) {
+        dataList = trackingRes.value.data.data;
       } else {
         dataList = mockTracking;
       }
-      
+
+      // Build a map of vehicleNumber → latest shipment for outgoingStatus
+      let shipmentMap: Record<string, any> = {};
+      if (
+        shipmentsRes.status === 'fulfilled' &&
+        shipmentsRes.value.data?.success &&
+        Array.isArray(shipmentsRes.value.data.data)
+      ) {
+        for (const s of shipmentsRes.value.data.data) {
+          const vn = (s.vehicleNumber || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+          if (vn) {
+            // Keep most recently updated shipment per vehicle
+            if (!shipmentMap[vn] || new Date(s.updatedAt) > new Date(shipmentMap[vn].updatedAt)) {
+              shipmentMap[vn] = s;
+            }
+          }
+        }
+      }
+
+      // Merge outgoingStatus from shipment into each tracking vehicle
+      dataList = dataList.map((v: any) => {
+        const vn = (v.vehicleNumber || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        const matchedShipment = shipmentMap[vn];
+        if (matchedShipment) {
+          return {
+            ...v,
+            outgoingStatus: matchedShipment.outgoingStatus || v.outgoingStatus || 'Pending',
+            consignmentNumber: matchedShipment.consignmentNumber || v.consignmentNumber,
+            driverName: v.driverName || matchedShipment.driverName,
+            shipmentRef: matchedShipment,
+            lastUpdatedAt: matchedShipment.updatedAt || v.lastUpdate
+          };
+        }
+        return v;
+      });
+
       setVehicles(dataList);
       const currentSelected = selectedVehicleRef.current;
       if (dataList.length > 0 && !currentSelected) {
         setSelectedVehicle(dataList[0]);
       } else if (currentSelected) {
-        // Keep selection synced by normalized vehicle number
         const updated = dataList.find((v: any) => 
           v && v.vehicleNumber && currentSelected.vehicleNumber &&
           v.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === 
           currentSelected.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
         );
         if (updated) {
-          // Update if shipment ID, last update timestamp, or status label has changed, or if deep content changed
           if (
             updated._id !== currentSelected._id ||
             updated.lastUpdate !== currentSelected.lastUpdate ||
             updated.statusLabel !== currentSelected.statusLabel ||
+            updated.outgoingStatus !== currentSelected.outgoingStatus ||
             JSON.stringify(updated) !== JSON.stringify(currentSelected)
           ) {
             setSelectedVehicle(updated);
@@ -164,7 +208,6 @@ export default function LiveTrackingPage() {
       if (!selectedVehicleRef.current && mockTracking.length > 0) {
         setSelectedVehicle(mockTracking[0]);
       }
-      // Only toast on manual refresh
       if (!isSilent) toast.error("Failed to refresh tracking data");
     } finally {
       if (!isSilent) setLoading(false);
@@ -462,11 +505,11 @@ export default function LiveTrackingPage() {
                              </div>
                              <div className="space-y-1">
                                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">From</p>
-                                <p className="text-sm font-bold">{selectedVehicle?.shipment?.origin || "Warehouse"}</p>
+                                <p className="text-sm font-bold">{selectedVehicle?.shipment?.origin || selectedVehicle?.shipmentRef?.consignor?.name || "Warehouse"}</p>
                              </div>
                              <div className="space-y-1">
                                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">To</p>
-                                <p className="text-sm font-bold">{selectedVehicle?.shipment?.destination || "Destination"}</p>
+                                <p className="text-sm font-bold">{selectedVehicle?.shipment?.destination || selectedVehicle?.shipmentRef?.consignee?.name || "Destination"}</p>
                              </div>
                              <div className="space-y-1">
                                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Vehicle Type</p>
@@ -481,6 +524,29 @@ export default function LiveTrackingPage() {
                                 <div className="flex items-center gap-1.5 text-sm font-bold">
                                    <Clock className="w-3.5 h-3.5 text-primary" />
                                    {selectedVehicle?.lastUpdate ? new Date(selectedVehicle.lastUpdate).toLocaleTimeString() : "N/A"}
+                                </div>
+                             </div>
+                             {/* Outgoing Status — synced from Shipments page */}
+                             <div className="col-span-2 space-y-1 pt-2 border-t border-border/30">
+                                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Outgoing Status</p>
+                                <div className="flex items-center gap-2">
+                                  <span className={cn(
+                                    "inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border",
+                                    selectedVehicle?.outgoingStatus === 'Delivered' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
+                                    selectedVehicle?.outgoingStatus === 'In Transit' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
+                                    selectedVehicle?.outgoingStatus === 'Dispatched' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' :
+                                    selectedVehicle?.outgoingStatus === 'Out for Delivery' ? 'bg-violet-500/10 text-violet-400 border-violet-500/30' :
+                                    selectedVehicle?.outgoingStatus === 'Arrived at Branch' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' :
+                                    selectedVehicle?.outgoingStatus === 'Loaded' ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' :
+                                    'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                  )}>
+                                    {selectedVehicle?.outgoingStatus || 'Pending'}
+                                  </span>
+                                  {selectedVehicle?.lastUpdatedAt && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      Updated {new Date(selectedVehicle.lastUpdatedAt).toLocaleString()}
+                                    </span>
+                                  )}
                                 </div>
                              </div>
                           </div>

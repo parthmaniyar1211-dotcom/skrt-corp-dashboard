@@ -84,6 +84,7 @@ function ShipmentsPageContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [shipmentList, setShipmentList] = useState<any[]>(mockShipments);
   const [loading, setLoading] = useState(true);
+  const [savingStatusId, setSavingStatusId] = useState<string | null>(null);
 
   // Modal states
   const [selectedShipment, setSelectedShipment] = useState<any>(null);
@@ -141,18 +142,29 @@ function ShipmentsPageContent() {
   });
 
   const handleOutgoingStatusChange = useCallback(async (shipmentId: string, newStatus: string) => {
+    // Optimistically update UI
+    const prevList = shipmentList;
+    setShipmentList(prev => prev.map(s => s._id === shipmentId ? { ...s, outgoingStatus: newStatus } : s));
+    setSavingStatusId(shipmentId);
     try {
-      const { data } = await api.put(`/shipments/${shipmentId}`, { outgoingStatus: newStatus });
+      const { data } = await api.put(`/shipments/${shipmentId}`, {
+        outgoingStatus: newStatus,
+        lastUpdatedAt: new Date().toISOString()
+      });
       if (data.success && data.data) {
         setShipmentList(prev => prev.map(s => s._id === shipmentId ? data.data : s));
+        toast.success(`Outgoing status updated to "${newStatus}"`);
       } else {
-        setShipmentList(prev => prev.map(s => s._id === shipmentId ? { ...s, outgoingStatus: newStatus } : s));
+        toast.success(`Outgoing status updated to "${newStatus}"`);
       }
-      toast.success(`Outgoing status updated to ${newStatus}`);
     } catch (error) {
-      toast.error('Failed to update outgoing status');
+      // Revert optimistic update on failure
+      setShipmentList(prevList);
+      toast.error('Failed to update outgoing status. Please try again.');
+    } finally {
+      setSavingStatusId(null);
     }
-  }, []);
+  }, [shipmentList]);
 
   const handleExport = () => {
     const listToExport = filteredShipments.length > 0 ? filteredShipments : shipmentList;
@@ -259,20 +271,33 @@ function ShipmentsPageContent() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Select
-                        value={shipment.outgoingStatus || 'Pending'}
-                        onValueChange={(val) => handleOutgoingStatusChange(shipment._id, val)}
-                      >
-                        <SelectTrigger className={cn("h-8 w-[145px] text-xs font-semibold border-border/50 bg-transparent", outgoingStatusColors[shipment.outgoingStatus] || 'text-yellow-400')}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {outgoingStatusOptions.map(opt => (
-                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="relative">
+                        <Select
+                          value={shipment.outgoingStatus || 'Pending'}
+                          onValueChange={(val) => handleOutgoingStatusChange(shipment._id, val)}
+                          disabled={savingStatusId === shipment._id}
+                        >
+                          <SelectTrigger className={cn(
+                            "h-8 w-[145px] text-xs font-semibold border-border/50 bg-transparent",
+                            savingStatusId === shipment._id ? "opacity-60 cursor-not-allowed" : "",
+                            outgoingStatusColors[shipment.outgoingStatus] || 'text-yellow-400'
+                          )}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {outgoingStatusOptions.map(opt => (
+                              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {savingStatusId === shipment._id && (
+                          <div className="absolute right-8 top-1/2 -translate-y-1/2">
+                            <div className="w-3 h-3 border border-primary/60 border-t-primary rounded-full animate-spin" />
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
+
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button
