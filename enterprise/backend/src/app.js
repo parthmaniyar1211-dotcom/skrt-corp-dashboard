@@ -55,16 +55,26 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Database Disconnected Mock Interceptor
-const mockDbMiddleware = require('./middleware/mockDbMiddleware');
-app.use('/api', mockDbMiddleware);
-
 // Basic Route
 app.get('/', (req, res) => {
   res.json({ message: 'SKRT Logistics API is running...' });
 });
 
-// Health Check Route
+// API Root - shows available endpoints
+app.get('/api', (req, res) => {
+  res.json({
+    name: 'SKRT Corp Logistics API',
+    version: '2.0.0',
+    status: 'running',
+    endpoints: [
+      '/api/health', '/api/auth', '/api/inventory', '/api/shipments',
+      '/api/vehicles', '/api/drivers', '/api/clients', '/api/expenses',
+      '/api/invoices', '/api/analytics', '/api/tracking'
+    ]
+  });
+});
+
+// Health + Debug routes BEFORE mock middleware so they are never intercepted
 app.get('/api/health', (req, res) => {
   const mongoose = require('mongoose');
   const dbState = mongoose.connection.readyState;
@@ -74,9 +84,34 @@ app.get('/api/health', (req, res) => {
     database: dbStateMap[dbState] || 'unknown',
     mode: dbState === 1 ? 'live' : 'mock',
     env: process.env.NODE_ENV || 'unknown',
+    mongoUri: process.env.MONGODB_URI ? process.env.MONGODB_URI.replace(/:([^@]+)@/, ':***@').substring(0, 80) + '...' : 'NOT SET',
     timestamp: new Date().toISOString() 
   });
 });
+
+app.get('/api/debug-db', async (req, res) => {
+  const mongoose = require('mongoose');
+  const state = mongoose.connection.readyState;
+  const stateMap = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+  // Try a fresh connect attempt to get real error
+  let testError = null;
+  if (state !== 1) {
+    try {
+      await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 8000, bufferCommands: false });
+    } catch (e) {
+      testError = e.message;
+    }
+  }
+  res.json({
+    dbState: stateMap[mongoose.connection.readyState] || 'unknown',
+    error: testError,
+    mongoUri: process.env.MONGODB_URI ? process.env.MONGODB_URI.replace(/:([^@]+)@/, ':***@') : 'NOT SET'
+  });
+});
+
+// Database Disconnected Mock Interceptor
+const mockDbMiddleware = require('./middleware/mockDbMiddleware');
+app.use('/api', mockDbMiddleware);
 
 // Load Modules
 app.use('/api/auth', require('./modules/auth/routes'));
