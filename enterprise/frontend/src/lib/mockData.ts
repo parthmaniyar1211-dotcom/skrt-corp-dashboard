@@ -107,8 +107,8 @@ export const drivers: any[] = driverNames.map((name, i) => {
   };
 });
 
-// 4. Inventory (31 records)
-export const inventory: any[] = Array.from({ length: 31 }, (_, i) => {
+// 4. Inventory (75 records)
+export const inventory: any[] = Array.from({ length: 75 }, (_, i) => {
   const sender = clientsList[i % clientsList.length];
   const receiver = clientsList[(i + 3) % clientsList.length];
   const origin = cities[i % cities.length];
@@ -168,8 +168,8 @@ export const inventory: any[] = Array.from({ length: 31 }, (_, i) => {
   };
 });
 
-// 5. Shipments (31 records)
-export const shipments: any[] = Array.from({ length: 31 }, (_, i) => {
+// 5. Shipments (40 records)
+export const shipments: any[] = Array.from({ length: 40 }, (_, i) => {
   const sender = clientsList[i % clientsList.length];
   const receiver = clientsList[(i + 5) % clientsList.length];
   const origin = cities[i % cities.length];
