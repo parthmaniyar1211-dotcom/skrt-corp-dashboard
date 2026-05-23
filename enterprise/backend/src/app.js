@@ -26,16 +26,22 @@ app.use(helmet());
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
+  'https://skrt-corp-dashboard.vercel.app',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    // Allow any skrt-corp-dashboard vercel preview/production URL
+    if (origin.includes('skrt-corp-dashboard') && origin.includes('vercel.app')) {
+      return callback(null, true);
     }
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true
 }));
@@ -60,7 +66,16 @@ app.get('/', (req, res) => {
 
 // Health Check Route
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  const mongoose = require('mongoose');
+  const dbState = mongoose.connection.readyState;
+  const dbStateMap = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+  res.json({ 
+    status: 'ok', 
+    database: dbStateMap[dbState] || 'unknown',
+    mode: dbState === 1 ? 'live' : 'mock',
+    env: process.env.NODE_ENV || 'unknown',
+    timestamp: new Date().toISOString() 
+  });
 });
 
 // Load Modules
