@@ -217,7 +217,8 @@ export default function LiveTrackingPage() {
 
   useEffect(() => {
     fetchTrackingData();
-    const interval = setInterval(() => fetchTrackingData(true), 30000);
+    // Poll every 10s for near-real-time timeline updates after outgoing status changes
+    const interval = setInterval(() => fetchTrackingData(true), 10000);
 
     // Only establish WebSocket on localhost where the backend server is running
     // On Vercel/production, the virtual DB adapter handles all data — no socket needed
@@ -251,11 +252,16 @@ export default function LiveTrackingPage() {
       });
     }
 
+    // Listen for cross-tab outgoing status change event
+    const handleStatusUpdate = () => fetchTrackingData(true);
+    window.addEventListener('skrt_outgoing_status_updated', handleStatusUpdate);
+
     return () => {
       clearInterval(interval);
       if (socket) socket.disconnect();
+      window.removeEventListener('skrt_outgoing_status_updated', handleStatusUpdate);
     };
-  }, [fetchTrackingData]); // Run once and keep socket connection alive
+  }, [fetchTrackingData]);
 
   const stats = useMemo(() => {
     const list = Array.isArray(vehicles) ? vehicles : [];

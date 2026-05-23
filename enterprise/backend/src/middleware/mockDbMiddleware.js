@@ -409,6 +409,84 @@ const mockDbMiddleware = (req, res, next) => {
     if (index !== -1) {
       store[index] = { ...store[index], ...req.body, updatedAt: new Date().toISOString() };
       console.log(`✏️ Updated mock item in ${storeKey} store.`);
+
+      // If shipment outgoingStatus was updated, sync the tracking mock store timeline
+      if (storeKey === 'shipments' && req.body.outgoingStatus && store[index].vehicleNumber) {
+        const updatedVehicleNo = store[index].vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        const trackingIdx = mockStore.tracking.findIndex(t =>
+          t.vehicleNumber && t.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === updatedVehicleNo
+        );
+        const outStatus = req.body.outgoingStatus;
+
+        // Rebuild timeline based on new outgoingStatus
+        const statusOrder = ['Pending', 'Loaded', 'Dispatched', 'In Transit', 'Arrived at Branch', 'Out for Delivery', 'Delivered'];
+        const stepDefs = [
+          { title: 'Vehicle Assigned', location: 'Origin Depot' },
+          { title: 'Shipment Loaded', location: 'Warehouse' },
+          { title: 'Dispatched', location: 'Origin Bypass' },
+          { title: 'In Transit', location: 'NH-48 Highway' },
+          { title: 'Arrived at Branch', location: 'Branch Hub' },
+          { title: 'Out for Delivery', location: 'Delivery Zone' },
+          { title: 'Delivered', location: 'Consignee Address' }
+        ];
+        const currentIdx = statusOrder.indexOf(outStatus);
+        const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const newTimeline = stepDefs.map((s, i) => ({
+          id: String(i + 1),
+          title: s.title,
+          location: s.location,
+          time: i <= currentIdx ? nowTime : '-',
+          status: i < currentIdx ? 'completed' : i === currentIdx ? (outStatus === 'Delivered' ? 'completed' : 'active') : 'pending',
+          description: i === currentIdx ? `Outgoing status updated from Shipments — ${outStatus}` : undefined
+        }));
+
+        const trackingStatus = ['Pending', 'Loaded'].includes(outStatus) ? 'idle' :
+          ['Delivered'].includes(outStatus) ? 'offline' : 'active';
+
+        if (trackingIdx !== -1) {
+          mockStore.tracking[trackingIdx] = {
+            ...mockStore.tracking[trackingIdx],
+            statusLabel: outStatus,
+            status: trackingStatus,
+            trackingHistory: newTimeline,
+            lastUpdate: new Date().toISOString(),
+            consignmentNumber: store[index].consignmentNumber,
+            outgoingStatus: outStatus
+          };
+          console.log(`🗺️ Synced tracking timeline for vehicle ${store[index].vehicleNumber} → ${outStatus}`);
+        } else {
+          // Create new tracking record if none exists for this vehicle
+          mockStore.tracking.unshift({
+            _id: `mock_track_${Date.now()}`,
+            consignmentNumber: store[index].consignmentNumber,
+            vehicleNumber: store[index].vehicleNumber,
+            driverName: store[index].driverName || 'Driver',
+            driverPhone: store[index].driverPhone || 'N/A',
+            type: 'Truck',
+            status: trackingStatus,
+            statusLabel: outStatus,
+            outgoingStatus: outStatus,
+            currentLocation: { lat: 22.3, lng: 73.1, address: 'In Transit' },
+            lastUpdate: new Date().toISOString(),
+            distance: 'Calculating...',
+            shipment: {
+              lrNo: store[index].consignmentNumber,
+              origin: store[index].consignor?.city || 'Origin',
+              destination: store[index].consignee?.city || store[index].toBranch || 'Destination',
+              sender: store[index].consignor?.name || '-',
+              receiver: store[index].consignee?.name || '-',
+              cargoType: store[index].description || 'Goods',
+              packages: store[index].quantity || 0,
+              weight: `${store[index].chargedWeight || 0} kg`,
+              value: `₹${(store[index].totalFreight || 0).toLocaleString()}`,
+              challanNo: `CHL-${(store[index].consignmentNumber || '').slice(-6)}`
+            },
+            trackingHistory: newTimeline
+          });
+          console.log(`🗺️ Created new tracking record for vehicle ${store[index].vehicleNumber}`);
+        }
+      }
+
       return res.json({ success: true, message: 'Updated successfully (Mock Mode)', data: store[index] });
     }
     return res.status(404).json({ success: false, message: 'Resource to update not found in Mock Store' });
