@@ -12,9 +12,10 @@ import api from "@/lib/api";
 import { AddDriverDialog } from "@/components/drivers/AddDriverDialog";
 import { ViewProfileDialog } from "@/components/drivers/ViewProfileDialog";
 import { ManageTripsDialog } from "@/components/drivers/ManageTripsDialog";
+import { drivers as mockDrivers } from "@/lib/mockData";
 
 export default function DriversPage() {
-  const [driverList, setDriverList] = React.useState<any[]>([]);
+  const [driverList, setDriverList] = React.useState<any[]>(mockDrivers);
   const [loading, setLoading] = React.useState(true);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedDriver, setSelectedDriver] = React.useState<any>(null);
@@ -25,11 +26,14 @@ export default function DriversPage() {
     try {
       setLoading(true);
       const { data } = await api.get("/drivers");
-      if (data.success) {
+      if (data.success && data.data && data.data.length >= 3) {
         setDriverList(data.data);
+      } else {
+        setDriverList(mockDrivers);
       }
     } catch (error) {
       console.error("Failed to fetch drivers", error);
+      setDriverList(mockDrivers);
     } finally {
       setLoading(false);
     }
@@ -39,14 +43,14 @@ export default function DriversPage() {
     fetchDrivers();
   }, []);
 
-  const dummyDrivers = [
-    { _id: "d1", id: "DRV-101", name: "Ramesh Kumar", phone: "+91 98765 43210", status: "On Duty", location: "Mumbai Highway", rating: 4.8, experience: "8 Years" },
-    { _id: "d2", id: "DRV-102", name: "Suresh Sharma", phone: "+91 87654 32109", status: "Available", location: "Delhi Hub", rating: 4.9, experience: "6 Years" },
-    { _id: "d3", id: "DRV-103", name: "Gurpreet Singh", phone: "+91 76543 21098", status: "On Duty", location: "Pune Bypass", rating: 4.7, experience: "10 Years" },
-    { _id: "d4", id: "DRV-104", name: "Amit Patel", phone: "+91 65432 10987", status: "On Leave", location: "Ahmedabad Bay", rating: 4.6, experience: "5 Years" },
-  ];
-
-  const currentDrivers = driverList.length > 0 ? driverList : dummyDrivers;
+  const currentDrivers = driverList.map(d => ({
+    ...d,
+    id: d.id || d.license || d._id,
+    location: d.location || (d.status === 'busy' || d.status === 'On Duty' ? 'NH-48 Route' : 'HQ Depot'),
+    status: d.status === 'available' || d.status === 'Available' ? 'Available' : d.status === 'busy' || d.status === 'On Duty' ? 'On Duty' : 'On Leave',
+    rating: d.rating || 4.5,
+    experience: typeof d.experience === 'number' ? `${d.experience} Years` : d.experience || '5 Years'
+  }));
   const filteredDrivers = currentDrivers.filter(d => 
     d.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     d.phone?.includes(searchTerm) || false

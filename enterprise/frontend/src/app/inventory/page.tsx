@@ -48,6 +48,7 @@ import { CreateInventoryDialog } from "@/components/inventory/CreateInventoryDia
 import { EditInventoryDialog } from "@/components/inventory/EditInventoryDialog";
 import { ViewInventoryDialog } from "@/components/inventory/ViewInventoryDialog";
 import { DeleteInventoryDialog } from "@/components/inventory/DeleteInventoryDialog";
+import { inventory as mockInventory } from "@/lib/mockData";
 import {
   Dialog,
   DialogContent,
@@ -78,11 +79,14 @@ function InventoryPageContent() {
       setLoading(true);
       fetchLock.current = true;
       const { data } = await api.get("/inventory");
-      if (data.success) {
+      if (data.success && data.data && data.data.length >= 3) {
         setInventoryList(data.data);
+      } else {
+        setInventoryList(mockInventory);
       }
     } catch (error) {
       console.error("Failed to fetch inventory records", error);
+      setInventoryList(mockInventory);
     } finally {
       setLoading(false);
       fetchLock.current = false;

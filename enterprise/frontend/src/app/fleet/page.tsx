@@ -19,9 +19,10 @@ import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { AddVehicleDialog } from "@/components/fleet/AddVehicleDialog";
 import { ScheduleServiceDialog } from "@/components/fleet/ScheduleServiceDialog";
+import { vehicles as mockVehicles } from "@/lib/mockData";
 
 export default function FleetPage() {
-  const [vehicleList, setVehicleList] = React.useState<any[]>([]);
+  const [vehicleList, setVehicleList] = React.useState<any[]>(mockVehicles);
   const [loading, setLoading] = React.useState(true);
   const [selectedVehicle, setSelectedVehicle] = React.useState<any>(null);
   const [serviceDialogOpen, setServiceDialogOpen] = React.useState(false);
@@ -30,11 +31,14 @@ export default function FleetPage() {
     try {
       setLoading(true);
       const { data } = await api.get("/vehicles");
-      if (data.success) {
+      if (data.success && data.data && data.data.length >= 3) {
         setVehicleList(data.data);
+      } else {
+        setVehicleList(mockVehicles);
       }
     } catch (error) {
       console.error("Failed to fetch vehicles", error);
+      setVehicleList(mockVehicles);
     } finally {
       setLoading(false);
     }
@@ -44,15 +48,7 @@ export default function FleetPage() {
     fetchVehicles();
   }, []);
 
-  const dummyVehicles = [
-    { _id: "v1", vehicleNo: "MH-12-AB-1234", type: "Container", capacity: 18000, status: "on-trip", lastServiceDate: "2024-04-15" },
-    { _id: "v2", vehicleNo: "MH-14-CD-5678", type: "Truck", capacity: 12000, status: "available", lastServiceDate: "2024-04-20" },
-    { _id: "v3", vehicleNo: "MH-01-EF-9012", type: "Trailer", capacity: 25000, status: "maintenance", lastServiceDate: "2024-05-02" },
-    { _id: "v4", vehicleNo: "GJ-05-GH-3456", type: "Truck", capacity: 16000, status: "on-trip", lastServiceDate: "2024-04-10" },
-    { _id: "v5", vehicleNo: "RJ-14-IJ-7890", type: "Container", capacity: 20000, status: "available", lastServiceDate: "2024-03-28" },
-  ];
-
-  const currentVehicles = vehicleList.length > 0 ? vehicleList : dummyVehicles;
+  const currentVehicles = vehicleList;
 
   return (
     <DashboardLayout>

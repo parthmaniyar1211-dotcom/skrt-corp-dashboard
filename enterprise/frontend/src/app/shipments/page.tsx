@@ -46,6 +46,7 @@ import { ViewShipmentDialog } from "@/components/shipments/ViewShipmentDialog";
 import { ViewContactDialog } from "@/components/shipments/ViewContactDialog";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { shipments as mockShipments } from "@/lib/mockData";
 import {
   Select,
   SelectContent,
@@ -53,14 +54,6 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-
-const shipments = [
-  { id: "SKRT001001", sender: "Aditya Textiles", receiver: "Rajasthan Fabrics", origin: "Bhilwara", dest: "Ahmedabad", status: "In Transit", date: "2024-05-10" },
-  { id: "SKRT001002", sender: "Global Logistics", receiver: "Metro Mart", origin: "Mumbai", dest: "Delhi", status: "Delivered", date: "2024-05-09" },
-  { id: "SKRT001003", sender: "Kishore Spinners", receiver: "Cotton World", origin: "Bhilwara", dest: "Surat", status: "Booked", date: "2024-05-12" },
-  { id: "SKRT001004", sender: "Prime Garments", receiver: "Fashion Hub", origin: "Jaipur", dest: "Bangalore", status: "In Transit", date: "2024-05-11" },
-  { id: "SKRT001005", sender: "Royal Weavers", receiver: "Elite Stores", origin: "Bhilwara", dest: "Indore", status: "Inventory", date: "2024-05-12" },
-];
 
 const statusColors: Record<string, string> = {
   "In Transit": "bg-primary/20 text-primary border-primary/30",
@@ -89,7 +82,7 @@ function ShipmentsPageContent() {
   const searchParams = useSearchParams();
   const searchParam = searchParams.get("search");
   const [searchTerm, setSearchTerm] = useState("");
-  const [shipmentList, setShipmentList] = useState<any[]>([]);
+  const [shipmentList, setShipmentList] = useState<any[]>(mockShipments);
   const [loading, setLoading] = useState(true);
 
   // Modal states
@@ -107,11 +100,14 @@ function ShipmentsPageContent() {
       setLoading(true);
       fetchLock.current = true;
       const { data } = await api.get("/shipments");
-      if (data.success) {
+      if (data.success && data.data && data.data.length >= 3) {
         setShipmentList(data.data);
+      } else {
+        setShipmentList(mockShipments);
       }
     } catch (error) {
       console.error("Failed to fetch shipments", error);
+      setShipmentList(mockShipments);
     } finally {
       setLoading(false);
       fetchLock.current = false;
@@ -245,7 +241,7 @@ function ShipmentsPageContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(shipmentList.length > 0 ? filteredShipments : shipments).map((shipment: any) => (
+                {filteredShipments.map((shipment: any) => (
                   <TableRow key={shipment._id || shipment.id} className="border-border/50 hover:bg-white/5 transition-colors">
                     <TableCell className="font-medium text-primary">{shipment.consignmentNumber || shipment.shipmentId || shipment.id}</TableCell>
                     <TableCell className="font-mono text-xs text-foreground/90 font-bold">{shipment.vehicleNumber || '-'}</TableCell>

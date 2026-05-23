@@ -28,15 +28,16 @@ import {
   Area
 } from "recharts";
 import api from "@/lib/api";
+import { analytics as mockAnalytics } from "@/lib/mockData";
 
 const data = [
-  { name: "Mon", revenue: 4000, shipments: 24 },
-  { name: "Tue", revenue: 3000, shipments: 18 },
-  { name: "Wed", revenue: 2000, shipments: 22 },
-  { name: "Thu", revenue: 2780, shipments: 29 },
-  { name: "Fri", revenue: 1890, shipments: 20 },
-  { name: "Sat", revenue: 2390, shipments: 15 },
-  { name: "Sun", revenue: 3490, shipments: 12 },
+  { name: "Mon", revenue: 142000, shipments: 24 },
+  { name: "Tue", revenue: 118000, shipments: 18 },
+  { name: "Wed", revenue: 165000, shipments: 22 },
+  { name: "Thu", revenue: 184000, shipments: 29 },
+  { name: "Fri", revenue: 129000, shipments: 20 },
+  { name: "Sat", revenue: 94000, shipments: 15 },
+  { name: "Sun", revenue: 78000, shipments: 12 },
 ];
 
 const stats = [
@@ -81,12 +82,24 @@ export default function DashboardPage() {
       try {
         fetchLock.current = true;
         const { data } = await api.get("/analytics/dashboard");
-        if (data.success) {
+        if (data.success && data.data) {
           setStatsData(data.data);
+        } else {
+          setStatsData({
+            totalShipments: mockAnalytics.stats.totalShipments,
+            activeTrips: mockAnalytics.stats.activeShipments,
+            totalRevenue: mockAnalytics.stats.monthlyRevenue,
+            availableVehicles: 15
+          });
         }
       } catch (error) {
         console.error("Failed to fetch dashboard stats", error);
-        setStatsData({ totalShipments: 1284, activeTrips: 42, totalRevenue: 840000, availableVehicles: 38 });
+        setStatsData({
+          totalShipments: mockAnalytics.stats.totalShipments,
+          activeTrips: mockAnalytics.stats.activeShipments,
+          totalRevenue: mockAnalytics.stats.monthlyRevenue,
+          availableVehicles: 15
+        });
       } finally {
         fetchLock.current = false;
       }

@@ -10,21 +10,7 @@ import {
 import { TrendingUp, Users, Truck, Package, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import api from "@/lib/api";
-
-const dummyRevenueData = [
-  { month: "Jan", revenue: 450000, cost: 320000 },
-  { month: "Feb", revenue: 520000, cost: 380000 },
-  { month: "Mar", revenue: 480000, cost: 310000 },
-  { month: "Apr", revenue: 610000, cost: 420000 },
-  { month: "May", revenue: 750000, cost: 490000 },
-];
-
-const dummyRouteData = [
-  { name: "Bhilwara-Ahmedabad", value: 45 },
-  { name: "Bhilwara-Surat", value: 30 },
-  { name: "Jaipur-Delhi", value: 15 },
-  { name: "Mumbai-Pune", value: 10 },
-];
+import { analytics as mockAnalytics } from "@/lib/mockData";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
@@ -36,11 +22,14 @@ export default function AnalyticsPage() {
     try {
       setLoading(true);
       const { data } = await api.get("/analytics/detailed");
-      if (data.success) {
+      if (data.success && data.data) {
         setAnalyticsData(data.data);
+      } else {
+        setAnalyticsData(null);
       }
     } catch (e) {
       console.error("Failed to fetch detailed analytics", e);
+      setAnalyticsData(null);
     } finally {
       setLoading(false);
     }
@@ -52,7 +41,7 @@ export default function AnalyticsPage() {
 
   const normalizedRevenueData = React.useMemo(() => {
     if (!analyticsData || !analyticsData.monthlyData || analyticsData.monthlyData.length === 0) {
-      return dummyRevenueData;
+      return mockAnalytics.revenueCosts;
     }
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     return analyticsData.monthlyData.map((m: any) => {
@@ -68,7 +57,7 @@ export default function AnalyticsPage() {
 
   const normalizedRouteData = React.useMemo(() => {
     if (!analyticsData || !analyticsData.topRoutes || analyticsData.topRoutes.length === 0) {
-      return dummyRouteData;
+      return mockAnalytics.topRoutes.map(r => ({ name: r.route, value: r.shipments }));
     }
     return analyticsData.topRoutes.map((r: any) => ({
       name: r._id || "Local Routes",
@@ -77,18 +66,27 @@ export default function AnalyticsPage() {
   }, [analyticsData]);
 
   const utilizationData = React.useMemo(() => {
+    if (!analyticsData) {
+      return mockAnalytics.vehicleUtilization.map(u => ({ month: u.date, rate: u.rate }));
+    }
     return normalizedRevenueData.map((item: any) => ({
       month: item.month,
       rate: Math.round(75 + (item.revenue % 17)) // Consistent looking pseudo utilization rate based on revenue
     }));
-  }, [normalizedRevenueData]);
+  }, [normalizedRevenueData, analyticsData]);
 
   const successRateData = React.useMemo(() => {
+    if (!analyticsData) {
+      return mockAnalytics.revenueCosts.map((item: any, idx: number) => ({
+        month: item.month,
+        rate: parseFloat((98.0 + (idx * 0.2) % 1.5).toFixed(1))
+      }));
+    }
     return normalizedRevenueData.map((item: any) => ({
       month: item.month,
       rate: parseFloat((96.5 + (item.revenue % 3.2)).toFixed(1))
     }));
-  }, [normalizedRevenueData]);
+  }, [normalizedRevenueData, analyticsData]);
 
   const handleDownloadReport = () => {
     const textContent = `

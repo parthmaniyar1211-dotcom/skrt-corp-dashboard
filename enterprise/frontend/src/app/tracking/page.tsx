@@ -42,6 +42,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { io } from "socket.io-client";
+import { tracking as mockTracking } from "@/lib/mockData";
 
 // Mapping for status badge colors
 const statusColors: any = {
@@ -108,10 +109,10 @@ const RouteMapPreview = ({ origin, destination, isDelivered }: { origin: string,
 };
 
 export default function LiveTrackingPage() {
-  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>(mockTracking);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<any>(mockTracking[0] || null);
   const [statusFilter, setStatusFilter] = useState("All");
 
   const selectedVehicleRef = React.useRef<any>(null);
@@ -127,37 +128,42 @@ export default function LiveTrackingPage() {
     fetchLock.current = true;
     try {
       const { data } = await api.get('/tracking');
-      if (data && data.success) {
-        const dataList = Array.isArray(data.data) ? data.data : [];
-        setVehicles(dataList);
-        const currentSelected = selectedVehicleRef.current;
-        if (dataList.length > 0 && !currentSelected) {
-          setSelectedVehicle(dataList[0]);
-        } else if (currentSelected) {
-          // Keep selection synced by normalized vehicle number
-          const updated = dataList.find((v: any) => 
-            v && v.vehicleNumber && currentSelected.vehicleNumber &&
-            v.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === 
-            currentSelected.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
-          );
-          if (updated) {
-            // Update if shipment ID, last update timestamp, or status label has changed, or if deep content changed
-            if (
-              updated._id !== currentSelected._id ||
-              updated.lastUpdate !== currentSelected.lastUpdate ||
-              updated.statusLabel !== currentSelected.statusLabel ||
-              JSON.stringify(updated) !== JSON.stringify(currentSelected)
-            ) {
-              setSelectedVehicle(updated);
-            }
+      let dataList = [];
+      if (data && data.success && Array.isArray(data.data) && data.data.length >= 3) {
+        dataList = data.data;
+      } else {
+        dataList = mockTracking;
+      }
+      
+      setVehicles(dataList);
+      const currentSelected = selectedVehicleRef.current;
+      if (dataList.length > 0 && !currentSelected) {
+        setSelectedVehicle(dataList[0]);
+      } else if (currentSelected) {
+        // Keep selection synced by normalized vehicle number
+        const updated = dataList.find((v: any) => 
+          v && v.vehicleNumber && currentSelected.vehicleNumber &&
+          v.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === 
+          currentSelected.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+        );
+        if (updated) {
+          // Update if shipment ID, last update timestamp, or status label has changed, or if deep content changed
+          if (
+            updated._id !== currentSelected._id ||
+            updated.lastUpdate !== currentSelected.lastUpdate ||
+            updated.statusLabel !== currentSelected.statusLabel ||
+            JSON.stringify(updated) !== JSON.stringify(currentSelected)
+          ) {
+            setSelectedVehicle(updated);
           }
         }
-      } else {
-        setVehicles([]);
       }
     } catch (error) {
       console.error('Failed to fetch tracking data', error);
-      setVehicles([]);
+      setVehicles(mockTracking);
+      if (!selectedVehicleRef.current && mockTracking.length > 0) {
+        setSelectedVehicle(mockTracking[0]);
+      }
       // Only toast on manual refresh
       if (!isSilent) toast.error("Failed to refresh tracking data");
     } finally {

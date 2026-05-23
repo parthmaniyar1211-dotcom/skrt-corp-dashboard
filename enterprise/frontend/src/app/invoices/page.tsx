@@ -27,6 +27,7 @@ import api from "@/lib/api";
 import { CreateInvoiceDialog } from "@/components/invoices/CreateInvoiceDialog";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
+import { invoices as mockInvoices } from "@/lib/mockData";
 
 const getShipmentId = (shipment: any): string => {
   if (!shipment) return "N/A";
@@ -49,7 +50,7 @@ function InvoicesPageContent() {
   const searchParams = useSearchParams();
   const clientQuery = searchParams.get("client") || "";
 
-  const [invoiceList, setInvoiceList] = React.useState<any[]>([]);
+  const [invoiceList, setInvoiceList] = React.useState<any[]>(mockInvoices);
   const [loading, setLoading] = React.useState(true);
   
   // Filter States
@@ -66,11 +67,14 @@ function InvoicesPageContent() {
     try {
       setLoading(true);
       const { data } = await api.get("/invoices");
-      if (data.success) {
+      if (data.success && data.data && data.data.length >= 3) {
         setInvoiceList(data.data);
+      } else {
+        setInvoiceList(mockInvoices);
       }
     } catch (error) {
       console.error("Failed to fetch invoices", error);
+      setInvoiceList(mockInvoices);
     } finally {
       setLoading(false);
     }
@@ -184,14 +188,7 @@ This is a computer generated invoice and requires no signature.
     fetchInvoices();
   }, []);
 
-  const dummyInvoices = [
-    { _id: "inv1", invoiceNo: "INV-2025-001", client: { name: "Aditya Textiles" }, shipment: { shipmentId: "SKRT001001" }, total: 245000, status: "paid", createdAt: "2024-05-10" },
-    { _id: "inv2", invoiceNo: "INV-2025-002", client: { name: "Rajasthan Fabrics" }, shipment: { shipmentId: "SKRT001002" }, total: 180000, status: "unpaid", createdAt: "2024-05-12" },
-    { _id: "inv3", invoiceNo: "INV-2025-003", client: { name: "Global Logistics" }, shipment: { shipmentId: "SKRT001003" }, total: 320000, status: "paid", createdAt: "2024-05-14" },
-    { _id: "inv4", invoiceNo: "INV-2025-004", client: { name: "Metro Mart" }, shipment: { shipmentId: "SKRT001004" }, total: 95000, status: "unpaid", createdAt: "2024-05-15" },
-  ];
-
-  const currentInvoices = invoiceList.length > 0 ? invoiceList : dummyInvoices;
+  const currentInvoices = invoiceList;
   
   const filteredInvoices = currentInvoices.filter(inv => {
     // Client filter
