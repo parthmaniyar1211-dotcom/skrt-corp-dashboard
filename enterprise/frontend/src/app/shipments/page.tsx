@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -214,12 +214,6 @@ function applyShipFilters(list: any[], filters: ShipFilters, searchTerm: string)
   });
 }
 
-const statusColors: Record<string, string> = {
-  "In Transit": "bg-primary/20 text-primary border-primary/30",
-  "Delivered": "bg-accent/20 text-accent border-accent/30",
-  "Booked": "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  "Inventory": "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-};
 
 const outgoingStatusOptions = [
   'Pending', 'Loaded', 'Dispatched', 'In Transit',
@@ -334,7 +328,7 @@ function ShipmentsPageContent() {
       toast.info("No shipment records to export");
       return;
     }
-    const headers = ["Consignment Number", "Vehicle Number", "Consignor Name", "Consignee Name", "To Branch", "Package Type", "Quantity", "Charged Weight", "Payment Mode", "Total Freight", "Status", "Outgoing Status", "Date"];
+    const headers = ["Consignment Number", "Vehicle Number", "Consignor Name", "Consignee Name", "To Branch", "Package Type", "Quantity", "Charged Weight", "Payment Mode", "Total Freight", "Outgoing Status", "Date"];
     const csvRows = listToExport.map(s => [
       s.consignmentNumber || s.id,
       s.vehicleNumber || "",
@@ -346,7 +340,6 @@ function ShipmentsPageContent() {
       s.chargedWeight || 0,
       s.paymentMode || "",
       s.totalFreight || 0,
-      s.status || "Booked",
       s.outgoingStatus || "Pending",
       s.createdAt ? new Date(s.createdAt).toLocaleDateString() : ""
     ].join(","));
@@ -441,7 +434,6 @@ function ShipmentsPageContent() {
                   <TableHead>Charged Weight</TableHead>
                   <TableHead>Payment Mode</TableHead>
                   <TableHead>Total Freight</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead>Outgoing Status</TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
@@ -459,11 +451,6 @@ function ShipmentsPageContent() {
                     <TableCell>{shipment.chargedWeight ?? '-'}</TableCell>
                     <TableCell>{shipment.paymentMode || '-'}</TableCell>
                     <TableCell>₹{shipment.totalFreight?.toLocaleString() || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={cn("px-2 py-0.5", statusColors[shipment.status] || 'bg-muted text-muted-foreground border-border')}>
-                        {shipment.status || 'Booked'}
-                      </Badge>
-                    </TableCell>
                     <TableCell>
                       <div className="relative">
                         <Select

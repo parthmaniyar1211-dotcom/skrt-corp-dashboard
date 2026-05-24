@@ -44,15 +44,54 @@ import { toast } from "sonner";
 import { io } from "socket.io-client";
 import { tracking as mockTracking } from "@/lib/mockData";
 
-// Mapping for status badge colors
+// Full outgoing status color map — all 7 stages
 const statusColors: any = {
-  'active': 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20', // Using green for active/in-transit
-  'in-transit': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-  'idle': 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-  'offline': 'bg-slate-500/10 text-slate-500 border-slate-500/20',
-  'Delivered': 'bg-purple-500/10 text-purple-500 border-purple-500/20',
-  'In Transit': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-  'Pending': 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+  // Vehicle-level tracking states (internal)
+  'active':   'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+  'in-transit':'bg-blue-500/10 text-blue-500 border-blue-500/20',
+  'idle':     'bg-amber-500/10 text-amber-500 border-amber-500/20',
+  'offline':  'bg-slate-500/10 text-slate-500 border-slate-500/20',
+  // Outgoing statuses from Shipments (source of truth)
+  'Pending':           'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  'Loaded':            'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  'Dispatched':        'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+  'In Transit':        'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  'Arrived at Branch': 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+  'Out for Delivery':  'bg-violet-500/10 text-violet-400 border-violet-500/20',
+  'Delivered':         'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  'Delayed':           'bg-red-500/10 text-red-400 border-red-500/20',
+  'Cancelled':         'bg-rose-500/10 text-rose-400 border-rose-500/20',
+};
+
+// Client-side timeline generator — mirrors backend generateTimeline() logic
+// so it works correctly even when using mock/fallback data
+const buildTimeline = (outgoingStatus: string) => {
+  const steps = [
+    { id: '1', title: 'Vehicle Assigned',          location: 'Origin Depot' },
+    { id: '2', title: 'Shipment Loaded',            location: 'Origin Warehouse' },
+    { id: '3', title: 'Dispatched',                 location: 'Origin Bypass' },
+    { id: '4', title: 'In Transit',                 location: 'NH-48 Highway' },
+    { id: '5', title: 'Arrived at Branch',          location: 'Branch Hub' },
+    { id: '6', title: 'Out for Delivery',           location: 'Delivery Zone' },
+    { id: '7', title: 'Delivered / Reached Destination', location: 'Consignee Address' },
+  ];
+  const statusOrder: Record<string, number> = {
+    'Pending': 0, 'Loaded': 1, 'Dispatched': 2,
+    'In Transit': 3, 'Arrived at Branch': 4,
+    'Out for Delivery': 5, 'Delivered': 6,
+    'Delayed': 3, 'Cancelled': 0,
+  };
+  const currentIdx = statusOrder[outgoingStatus] ?? -1;
+  const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return steps.map((s, i) => ({
+    ...s,
+    time: i <= currentIdx ? now : '-',
+    status: i < currentIdx ? 'completed'
+          : i === currentIdx
+            ? (outgoingStatus === 'Delivered' || outgoingStatus === 'Cancelled' ? 'completed' : 'active')
+          : 'pending',
+    description: i === currentIdx ? `Status: ${outgoingStatus}` : undefined,
+  }));
 };
 
 // Premium dark map SVG component
@@ -127,57 +166,145 @@ export default function LiveTrackingPage() {
     if (!isSilent) setLoading(true);
     fetchLock.current = true;
     try {
-      // Fetch tracking + shipments in parallel to merge outgoingStatus
+      // Always fetch shipments to get real outgoingStatus — this is the source of truth
       const [trackingRes, shipmentsRes] = await Promise.allSettled([
         api.get('/tracking'),
         api.get('/shipments')
       ]);
 
-      let dataList: any[] = [];
-      if (
-        trackingRes.status === 'fulfilled' &&
-        trackingRes.value.data?.success &&
-        Array.isArray(trackingRes.value.data.data) &&
-        trackingRes.value.data.data.length >= 3
-      ) {
-        dataList = trackingRes.value.data.data;
-      } else {
-        dataList = mockTracking;
-      }
-
-      // Build a map of vehicleNumber → latest shipment for outgoingStatus
+      // Build shipment map: normalized vehicleNumber → latest active (or latest overall) shipment
       let shipmentMap: Record<string, any> = {};
+      let shipmentList: any[] = [];
       if (
         shipmentsRes.status === 'fulfilled' &&
         shipmentsRes.value.data?.success &&
         Array.isArray(shipmentsRes.value.data.data)
       ) {
-        for (const s of shipmentsRes.value.data.data) {
+        shipmentList = shipmentsRes.value.data.data;
+        for (const s of shipmentList) {
           const vn = (s.vehicleNumber || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-          if (vn) {
-            // Keep most recently updated shipment per vehicle
-            if (!shipmentMap[vn] || new Date(s.updatedAt) > new Date(shipmentMap[vn].updatedAt)) {
-              shipmentMap[vn] = s;
+          if (!vn) continue;
+          if (!shipmentMap[vn]) {
+            shipmentMap[vn] = s;
+          } else {
+            const existing = shipmentMap[vn];
+            // Prefer active (non-delivered) shipment; among active, prefer most recently updated
+            const existingDelivered = existing.outgoingStatus === 'Delivered';
+            const newDelivered = s.outgoingStatus === 'Delivered';
+            if (existingDelivered && !newDelivered) {
+              shipmentMap[vn] = s; // prefer non-delivered
+            } else if (!existingDelivered && !newDelivered) {
+              // both active — keep most recently updated
+              if (new Date(s.updatedAt || s.createdAt) > new Date(existing.updatedAt || existing.createdAt)) {
+                shipmentMap[vn] = s;
+              }
+            }
+            // if both delivered, keep most recent
+            else if (existingDelivered && newDelivered) {
+              if (new Date(s.updatedAt || s.createdAt) > new Date(existing.updatedAt || existing.createdAt)) {
+                shipmentMap[vn] = s;
+              }
             }
           }
         }
       }
 
-      // Merge outgoingStatus from shipment into each tracking vehicle
+      let dataList: any[] = [];
+
+      // Use real tracking API data if available (>= 3 records)
+      const trackingApiOk =
+        trackingRes.status === 'fulfilled' &&
+        trackingRes.value.data?.success &&
+        Array.isArray(trackingRes.value.data.data) &&
+        trackingRes.value.data.data.length >= 3;
+
+      if (trackingApiOk) {
+        dataList = trackingRes.value.data.data;
+      } else if (shipmentList.length > 0) {
+        // Build tracking list directly from shipments — guaranteed real outgoingStatus
+        const seen = new Set<string>();
+        dataList = shipmentList
+          .filter(s => s.vehicleNumber)
+          .reduce((acc: any[], s) => {
+            const vn = s.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+            if (seen.has(vn)) return acc;
+            // Only use the shipment that won the priority selection above
+            if (shipmentMap[vn] && shipmentMap[vn].consignmentNumber !== s.consignmentNumber) return acc;
+            seen.add(vn);
+            const status = s.outgoingStatus || 'Pending';
+            const trackingStatus =
+              ['Pending', 'Loaded'].includes(status) ? 'idle' :
+              ['Delivered', 'Cancelled'].includes(status) ? 'offline' : 'active';
+            acc.push({
+              _id: s._id,
+              consignmentNumber: s.consignmentNumber,
+              vehicleNumber: s.vehicleNumber,
+              driverName: s.driverName || s.consignor?.name || 'Driver',
+              driverPhone: s.driverPhone || s.consignor?.phoneNumber || 'N/A',
+              type: 'Truck',
+              status: trackingStatus,
+              statusLabel: status,        // keep for compat
+              outgoingStatus: status,     // source of truth
+              currentLocation: { lat: 22.3, lng: 73.1, address: s.toBranch || 'In Transit' },
+              lastUpdate: s.updatedAt || s.createdAt,
+              lastUpdatedAt: s.updatedAt || s.createdAt,
+              distance: status === 'Delivered' ? '0 km' : 'Calculating...',
+              shipment: {
+                lrNo: s.consignmentNumber,
+                origin: s.consignor?.city || 'Origin',
+                destination: s.consignee?.city || s.toBranch || 'Destination',
+                sender: s.consignor?.name || '-',
+                receiver: s.consignee?.name || '-',
+                cargoType: s.packageType || s.description || 'Goods',
+                packages: s.quantity || 0,
+                weight: `${s.chargedWeight || s.actualWeight || 0} kg`,
+                value: `₹${(s.totalFreight || 0).toLocaleString()}`,
+                challanNo: `CHL-${(s.consignmentNumber || '').slice(-6)}`,
+              },
+              trackingHistory: buildTimeline(status),
+              shipmentRef: s,
+            });
+            return acc;
+          }, []);
+      } else {
+        // Last resort: static mock — but enrich with buildTimeline so at least timeline is correct
+        dataList = mockTracking.map((v: any) => ({
+          ...v,
+          outgoingStatus: v.outgoingStatus || v.statusLabel || 'Pending',
+          trackingHistory: v.trackingHistory || buildTimeline(v.outgoingStatus || v.statusLabel || 'Pending'),
+        }));
+      }
+
+      // Always merge real outgoingStatus from shipmentMap (overrides whatever tracking returned)
       dataList = dataList.map((v: any) => {
         const vn = (v.vehicleNumber || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-        const matchedShipment = shipmentMap[vn];
-        if (matchedShipment) {
+        const matched = shipmentMap[vn];
+        if (matched) {
+          const realStatus = matched.outgoingStatus || v.outgoingStatus || 'Pending';
+          const trackingStatus =
+            ['Pending', 'Loaded'].includes(realStatus) ? 'idle' :
+            ['Delivered', 'Cancelled'].includes(realStatus) ? 'offline' : 'active';
           return {
             ...v,
-            outgoingStatus: matchedShipment.outgoingStatus || v.outgoingStatus || 'Pending',
-            consignmentNumber: matchedShipment.consignmentNumber || v.consignmentNumber,
-            driverName: v.driverName || matchedShipment.driverName,
-            shipmentRef: matchedShipment,
-            lastUpdatedAt: matchedShipment.updatedAt || v.lastUpdate
+            outgoingStatus: realStatus,
+            statusLabel: realStatus,    // keep both in sync
+            status: trackingStatus,
+            consignmentNumber: matched.consignmentNumber || v.consignmentNumber,
+            driverName: v.driverName || matched.driverName || matched.consignor?.name || 'Driver',
+            lastUpdatedAt: matched.updatedAt || matched.createdAt || v.lastUpdate,
+            // Always rebuild timeline from real status so it reflects latest change
+            trackingHistory: buildTimeline(realStatus),
+            shipmentRef: matched,
           };
         }
-        return v;
+        // No shipment match — use whatever the vehicle has, but build timeline from it
+        const fallbackStatus = v.outgoingStatus || v.statusLabel || 'Pending';
+        return {
+          ...v,
+          outgoingStatus: fallbackStatus,
+          statusLabel: fallbackStatus,
+          trackingHistory: buildTimeline(fallbackStatus),
+        };
       });
 
       setVehicles(dataList);
@@ -185,18 +312,16 @@ export default function LiveTrackingPage() {
       if (dataList.length > 0 && !currentSelected) {
         setSelectedVehicle(dataList[0]);
       } else if (currentSelected) {
-        const updated = dataList.find((v: any) => 
+        const updated = dataList.find((v: any) =>
           v && v.vehicleNumber && currentSelected.vehicleNumber &&
-          v.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === 
+          v.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() ===
           currentSelected.vehicleNumber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
         );
         if (updated) {
           if (
-            updated._id !== currentSelected._id ||
-            updated.lastUpdate !== currentSelected.lastUpdate ||
-            updated.statusLabel !== currentSelected.statusLabel ||
             updated.outgoingStatus !== currentSelected.outgoingStatus ||
-            JSON.stringify(updated) !== JSON.stringify(currentSelected)
+            updated.statusLabel !== currentSelected.statusLabel ||
+            JSON.stringify(updated.trackingHistory) !== JSON.stringify(currentSelected.trackingHistory)
           ) {
             setSelectedVehicle(updated);
           }
@@ -204,11 +329,14 @@ export default function LiveTrackingPage() {
       }
     } catch (error) {
       console.error('Failed to fetch tracking data', error);
-      setVehicles(mockTracking);
-      if (!selectedVehicleRef.current && mockTracking.length > 0) {
-        setSelectedVehicle(mockTracking[0]);
-      }
-      if (!isSilent) toast.error("Failed to refresh tracking data");
+      const fallback = mockTracking.map((v: any) => ({
+        ...v,
+        outgoingStatus: v.outgoingStatus || v.statusLabel || 'Pending',
+        trackingHistory: buildTimeline(v.outgoingStatus || v.statusLabel || 'Pending'),
+      }));
+      setVehicles(fallback);
+      if (!selectedVehicleRef.current && fallback.length > 0) setSelectedVehicle(fallback[0]);
+      if (!isSilent) toast.error('Failed to refresh tracking data');
     } finally {
       if (!isSilent) setLoading(false);
       fetchLock.current = false;
@@ -446,8 +574,10 @@ export default function LiveTrackingPage() {
                             <p className="text-[10px] text-muted-foreground uppercase font-medium">SHP: {v?.consignmentNumber || "N/A"}</p>
                           </div>
                         </div>
-                        <Badge className={cn("text-[10px] font-bold h-6 border uppercase", statusColors[v?.statusLabel] || statusColors[v?.status || 'idle'])}>
-                          {v?.statusLabel || v?.status || "Idle"}
+                        <Badge className={cn("text-[10px] font-bold h-6 border uppercase", 
+                          statusColors[v?.outgoingStatus] || statusColors[v?.statusLabel] || statusColors[v?.status || 'idle'])}
+                        >
+                          {v?.outgoingStatus || v?.statusLabel || v?.status || 'Pending'}
                         </Badge>
                       </div>
 
@@ -494,8 +624,10 @@ export default function LiveTrackingPage() {
                              <div className="space-y-1">
                                 <div className="flex items-center gap-3">
                                    <h2 className="text-3xl font-extrabold tracking-tighter">{selectedVehicle?.vehicleNumber || "Unknown"}</h2>
-                                   <Badge className={cn("text-xs font-bold px-3 py-1 border uppercase", statusColors[selectedVehicle?.statusLabel] || statusColors[selectedVehicle?.status || 'idle'])}>
-                                      {selectedVehicle?.statusLabel || selectedVehicle?.status || "Idle"}
+                                   <Badge className={cn("text-xs font-bold px-3 py-1 border uppercase", 
+                                     statusColors[selectedVehicle?.outgoingStatus] || statusColors[selectedVehicle?.statusLabel] || statusColors[selectedVehicle?.status || 'idle'])}
+                                   >
+                                     {selectedVehicle?.outgoingStatus || selectedVehicle?.statusLabel || selectedVehicle?.status || 'Pending'}
                                    </Badge>
                                 </div>
                                 <p className="text-sm font-medium text-muted-foreground">
@@ -559,11 +691,11 @@ export default function LiveTrackingPage() {
                        </div>
 
                        <div className="h-[240px] xl:h-auto overflow-hidden rounded-xl">
-                          <RouteMapPreview 
-                             origin={selectedVehicle?.shipment?.origin || "Warehouse"} 
-                             destination={selectedVehicle?.shipment?.destination || "Destination"} 
-                             isDelivered={selectedVehicle?.statusLabel === 'Delivered'} 
-                          />
+                           <RouteMapPreview 
+                              origin={selectedVehicle?.shipment?.origin || selectedVehicle?.shipmentRef?.consignor?.city || 'Warehouse'} 
+                              destination={selectedVehicle?.shipment?.destination || selectedVehicle?.shipmentRef?.consignee?.city || selectedVehicle?.shipmentRef?.toBranch || 'Destination'} 
+                              isDelivered={selectedVehicle?.outgoingStatus === 'Delivered'} 
+                           />
                        </div>
                     </div>
                  </Card>
