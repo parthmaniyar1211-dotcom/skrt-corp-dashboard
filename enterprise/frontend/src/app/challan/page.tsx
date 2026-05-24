@@ -14,6 +14,7 @@ const today = () => {
 
 type ChallanRow = {
   id: number;
+  grNo: string;
   pkg: string;
   dest: string;
   content: string;
@@ -24,7 +25,7 @@ type ChallanRow = {
 };
 
 const emptyRow = (id: number): ChallanRow => ({
-  id, pkg: "", dest: "", content: "", consignor: "", consignee: "", total: "", wt: ""
+  id, grNo: "", pkg: "", dest: "", content: "", consignor: "", consignee: "", total: "", wt: ""
 });
 
 export default function ChallanPage() {
@@ -228,45 +229,59 @@ export default function ChallanPage() {
 
             {/* TABLE */}
             <div className="overflow-x-auto mb-4 border border-slate-700 rounded-md">
-              <table className="w-full min-w-[700px] border-collapse text-xs">
+              <table className="w-full min-w-[820px] border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-800/80">
-                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2">G.R. NO.</th>
-                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[8%]">PKG.</th>
-                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[15%]">DESTINATION</th>
-                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[15%]">CONTENT</th>
-                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[18%]">CONSIGNOR</th>
-                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[18%]">CONSIGNEE</th>
-                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[10%]">TOTAL</th>
-                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[8%]">WT</th>
+                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[5%] text-center">S. No</th>
+                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[12%] text-center">G.R. No</th>
+                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[7%] text-center">Pkg</th>
+                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[13%] text-center">Destination</th>
+                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[13%] text-center">Content</th>
+                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[16%] text-center">Consignor</th>
+                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[16%] text-center">Consignee</th>
+                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[9%] text-center">Total</th>
+                    <th className="border border-slate-700 text-[#2388ff] font-bold p-2 w-[7%] text-center">Wt</th>
                     <th className="border border-slate-700 text-[#2388ff] w-8"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row, idx) => (
                     <tr key={row.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="border border-slate-700 p-1 text-center font-bold text-slate-400">{idx + 1}</td>
+                      {/* S. No — auto-generated, read-only */}
+                      <td className="border border-slate-700 p-1 text-center font-bold text-slate-300 text-xs select-none">{idx + 1}</td>
+                      {/* G.R. No — editable */}
+                      <td className="border border-slate-700 p-0">
+                        <input type="text" value={row.grNo} onChange={(e) => updateRow(idx, 'grNo', e.target.value)} placeholder="GR No" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
+                      </td>
+                      {/* Pkg */}
                       <td className="border border-slate-700 p-0">
                         <input type="number" min="0" value={row.pkg} onChange={(e) => updateRow(idx, 'pkg', e.target.value)} placeholder="0" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
                       </td>
+                      {/* Destination */}
                       <td className="border border-slate-700 p-0">
                         <input type="text" value={row.dest} onChange={(e) => updateRow(idx, 'dest', e.target.value)} placeholder="City" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
                       </td>
+                      {/* Content */}
                       <td className="border border-slate-700 p-0">
                         <input type="text" value={row.content} onChange={(e) => updateRow(idx, 'content', e.target.value)} placeholder="Item" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
                       </td>
+                      {/* Consignor */}
                       <td className="border border-slate-700 p-0">
                         <input type="text" value={row.consignor} onChange={(e) => updateRow(idx, 'consignor', e.target.value)} placeholder="Sender" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
                       </td>
+                      {/* Consignee */}
                       <td className="border border-slate-700 p-0">
                         <input type="text" value={row.consignee} onChange={(e) => updateRow(idx, 'consignee', e.target.value)} placeholder="Receiver" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
                       </td>
+                      {/* Total */}
                       <td className="border border-slate-700 p-0 bg-slate-900/40">
                         <input type="number" step="0.01" value={row.total} onChange={(e) => updateRow(idx, 'total', e.target.value)} placeholder="0.00" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
                       </td>
+                      {/* Wt */}
                       <td className="border border-slate-700 p-0 bg-slate-900/40">
                         <input type="number" step="0.01" value={row.wt} onChange={(e) => updateRow(idx, 'wt', e.target.value)} placeholder="0.0" className="w-full h-full p-1.5 bg-transparent border-0 text-white text-center outline-none placeholder:text-slate-600" />
                       </td>
+                      {/* Delete */}
                       <td className="border border-slate-700 p-0 text-center">
                         <button onClick={() => deleteRow(idx)} className="delete-btn text-rose-500 hover:text-rose-400 p-1.5" title="Remove">
                           <X className="h-4 w-4" />
