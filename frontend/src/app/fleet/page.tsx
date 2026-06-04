@@ -230,7 +230,7 @@ export default function FleetPage() {
           <tbody>
             {filtered.map((row: any, i: number) => (
               <tr key={i} className={cn("transition-colors", rowMatches(row, searchQuery) ? "bg-[#2388ff]/10" : "hover:bg-slate-800/40")}>
-                <td className="border border-slate-700 p-2 text-center text-slate-400">{i + 1}</td>
+                <td className="border border-slate-700 p-2 text-center text-slate-400 font-mono text-xs">{row.sno || "—"}</td>
                 <td className="border border-slate-700 p-2 text-center text-white">{row._regDate || "—"}</td>
                 <td className="border border-slate-700 p-2 text-center text-white">{row.truckNo || "—"}</td>
                 <td className="border border-slate-700 p-2 text-center text-white">{row.driverName || "—"}</td>
