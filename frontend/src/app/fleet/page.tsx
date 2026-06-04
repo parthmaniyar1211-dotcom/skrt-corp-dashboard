@@ -113,7 +113,7 @@ export default function FleetPage() {
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-slate-900/80">
-              <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">#</th>
+              <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">No.</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Date</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Challan No</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Vehicle</th>
@@ -161,7 +161,7 @@ export default function FleetPage() {
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-slate-900/80">
-              <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">#</th>
+              <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">No.</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">D.R. No</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">G.R. No</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Date</th>
@@ -210,7 +210,7 @@ export default function FleetPage() {
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-slate-900/80">
-              <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">#</th>
+              <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">No.</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Date</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Truck No</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Driver</th>
@@ -265,7 +265,7 @@ export default function FleetPage() {
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="bg-slate-900/80">
-              <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">#</th>
+              <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">No.</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Date</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">Page No</th>
               <th className="border border-slate-700 p-2 text-[#2388ff] font-bold">S.No</th>
