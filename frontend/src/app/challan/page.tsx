@@ -100,6 +100,31 @@ export default function ChallanPage() {
   const [registerId, setRegisterId] = useState<string | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
 
+  const getNextChallanNo = useCallback(async (): Promise<string> => {
+    try {
+      const { data } = await api.get("/challan");
+      if (!data.success || !data.data || data.data.length === 0) {
+        return "323";
+      }
+      let maxNum = 322;
+      for (const c of data.data) {
+        if (c.challanNo) {
+          const match = String(c.challanNo).match(/\d+/);
+          if (match) {
+            const parsed = parseInt(match[0], 10);
+            if (!isNaN(parsed) && parsed > maxNum) {
+              maxNum = parsed;
+            }
+          }
+        }
+      }
+      return String(maxNum + 1);
+    } catch (err) {
+      console.error("Error getting next challan number:", err);
+      return "323";
+    }
+  }, []);
+
   const updateRow = (index: number, field: keyof ChallanRow, value: string) => {
     const newRows = [...rows];
     newRows[index] = { ...newRows[index], [field]: value };
@@ -197,6 +222,31 @@ export default function ChallanPage() {
       } catch (err: any) {
         if (err.response?.status === 404 && active) {
           setRegisterId(null);
+          setChallanNo("");
+          setFrom("");
+          setVehicleNo("");
+          setOwnerName("");
+          setDriverName("");
+          setRows(Array.from({ length: 5 }, (_, i) => emptyRow(i + 1)));
+          setCharges({
+            commission: "",
+            labour: "",
+            gr: "",
+            crossing: "",
+            truckFreight: "",
+            advance: "",
+            tfCredit: "",
+            totalToPay: "",
+            otherCharge: "",
+            lcdc: "",
+            crossing2: "",
+            doorDelivery: "",
+            balanceFreight: "",
+            note: ""
+          });
+          getNextChallanNo().then(nextNo => {
+            if (active) setChallanNo(nextNo);
+          });
         }
       } finally {
         if (active) setLoading(false);
@@ -204,7 +254,7 @@ export default function ChallanPage() {
     };
     fetchChallan();
     return () => { active = false; };
-  }, [date]);
+  }, [date, getNextChallanNo]);
 
   // Fetch driver list
   useEffect(() => {
@@ -272,6 +322,11 @@ export default function ChallanPage() {
 
   const buildChallanHtml = () => {
     const r = (v: any) => v || "";
+    const formatDate = (ds: string) => {
+      if (!ds) return "";
+      const p = ds.split("-");
+      return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : ds;
+    };
     const tableRows = rows.map((row, idx) => `
       <tr>
         <td style="text-align:center;">${idx + 1}</td>
@@ -314,20 +369,25 @@ export default function ChallanPage() {
 <body>
 <div class="challan">
     <div class="jurisdiction">Subject to BHILWARA  Jurisdiction</div>
-    <div class="header-top">
-        <div style="font-size:13px;font-weight:bold;color:#000080;">CHALLAN</div>
-        <div style="font-size:11px;font-weight:bold;color:#000080;">${r(challanNo)}</div>
-        <div class="title">Sant Kanwar Ram Transport Corp.</div>
-        <div style="font-size:12px;font-weight:bold;">📞 96809-92567<br>86196-06627</div>
+    <div class="header-top" style="display: flex; justify-content: space-between; align-items: start; width: 100%; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 8px;">
+        <div style="font-size:12px; font-weight:bold; color:#111; line-height: 1.5; text-align: left;">
+            <div style="font-size:14px; font-weight:900; color: #000;">Challan No. ${r(challanNo)}</div>
+            <div style="margin-top: 4px;">Date: ${formatDate(date)}</div>
+        </div>
+        <div style="text-align: center; flex-grow: 1; padding: 0 20px;">
+            <div class="title" style="font-size: 22px; font-weight: 900; color: #000080; letter-spacing: 0.5px;">Sant Kanwar Ram Transport Corp.</div>
+            <div style="font-size: 11px; font-weight: bold; color: #555; margin-top: 3px;">123-124, Transport Nagar, BHILWARA - 311001 (Raj.)</div>
+        </div>
+        <div style="font-size:11px; font-weight:bold; text-align: right; color:#000080; line-height: 1.4;">
+            <span>Mob.: 96809-92567</span><br/>
+            <span>Mob.: 86196-06627</span>
+        </div>
     </div>
-    <div class="subtitle">123-124, Transport Nagar, BHILWARA - 311001 (Raj.)</div>
-    <div class="fields">
-        <div class="field-group"><span class="field-label">From BHILWARA to</span><span class="field-value">${r(from)}</span></div>
-        <div class="field-group"><span class="field-label">Date</span><span class="field-value">${r(date)}</span></div>
-        
-        <div class="field-group"><span class="field-label">Vehicle No.</span><span class="field-value">${r(vehicleNo)}</span></div>
-        <div class="field-group"><span class="field-label">Owner's Name</span><span class="field-value">${r(ownerName)}</span></div>
-        <div class="field-group" style="flex:2;"><span class="field-label">Driver's Name</span><span class="field-value">${r(driverName)}</span></div>
+    <div class="fields" style="margin-top: 15px; display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+        <div class="field-group" style="flex: 1; min-width: 200px;"><span class="field-label">From BHILWARA to</span><span class="field-value">${r(from)}</span></div>
+        <div class="field-group" style="flex: 1; min-width: 200px;"><span class="field-label">Vehicle No.</span><span class="field-value">${r(vehicleNo)}</span></div>
+        <div class="field-group" style="flex: 1; min-width: 200px;"><span class="field-label">Owner's Name</span><span class="field-value">${r(ownerName)}</span></div>
+        <div class="field-group" style="flex: 2; min-width: 200px;"><span class="field-label">Driver's Name</span><span class="field-value">${r(driverName)}</span></div>
     </div>
     <div class="notice">Driver of this vehicle is responsible for goods which is loaded in this truck for safe &amp; sound delivery as per conditions mentioned overleaf.</div>
     <table>
@@ -501,7 +561,7 @@ export default function ChallanPage() {
               </div>
               <div className="flex items-end gap-2 border-b border-slate-700/50 pb-1">
                 <span className="text-xs font-bold text-[#2388ff] whitespace-nowrap">Challan No.</span>
-                <input type="text" value={challanNo} onChange={(e) => setChallanNo(e.target.value)} placeholder="CH-001" className="flex-1 bg-transparent border-0 border-b border-blue-800 text-white text-xs outline-none px-1 py-0.5 placeholder:text-slate-500 placeholder:italic" />
+                <input type="text" value={challanNo} onChange={(e) => setChallanNo(e.target.value)} placeholder="323" className="flex-1 bg-transparent border-0 border-b border-blue-800 text-white text-xs outline-none px-1 py-0.5 placeholder:text-slate-500 placeholder:italic" />
               </div>
               <div className="flex items-end gap-2 border-b border-slate-700/50 pb-1">
                 <span className="text-xs font-bold text-[#2388ff] whitespace-nowrap">Vehicle No.</span>
