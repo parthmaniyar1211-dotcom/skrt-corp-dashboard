@@ -309,8 +309,37 @@ export default function ChallanPage() {
       } else {
         const res = await api.post("/challan", payload);
         if (res.data.success) {
-          setRegisterId(res.data.data._id);
           toast.success("Challan saved successfully.");
+          
+          // Reset complete challan form
+          setRegisterId(null);
+          setFrom("");
+          setVehicleNo("");
+          setOwnerName("");
+          setDriverName("");
+          setCustomVehicle(false);
+          setCustomDriver(false);
+          setRows(Array.from({ length: 5 }, (_, i) => emptyRow(i + 1)));
+          setCharges({
+            commission: "",
+            labour: "",
+            gr: "",
+            crossing: "",
+            truckFreight: "",
+            advance: "",
+            tfCredit: "",
+            totalToPay: "",
+            otherCharge: "",
+            lcdc: "",
+            crossing2: "",
+            doorDelivery: "",
+            balanceFreight: "",
+            note: ""
+          });
+
+          // Generate next challan number without page refresh
+          const nextNo = await getNextChallanNo();
+          setChallanNo(nextNo);
         }
       }
     } catch (err: any) {
