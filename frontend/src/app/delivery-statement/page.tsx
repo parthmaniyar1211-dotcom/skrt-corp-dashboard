@@ -83,6 +83,32 @@ export default function DeliveryStatementPage() {
     (async () => {
       const [maxPage, maxSno] = await Promise.all([getMaxPageNo(), getMaxSno()]);
       setPageNo(String(maxPage + 1));
+
+      try {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const { data } = await api.get(`/delivery-statement/date/${todayStr}`);
+        if (data.success && data.data) {
+          const reg = data.data;
+          setPageNo(reg.pageNo || String(maxPage + 1));
+          if (reg.entries && reg.entries.length > 0) {
+            setRows(reg.entries.map((e: any, i: number) => ({
+              id: e._id || Date.now() + i,
+              sno: e.sno || String(i + 1),
+              drNo: e.drNo || "",
+              freight: e.freight || "",
+              labour: e.labour || "",
+              receiptCh: e.receiptCh || "",
+              dCom: e.dCom || "",
+              demurage: e.demurage || "",
+            })));
+            setInitialized(true);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load today's statement, falling back to empty/new rows", err);
+      }
+
       setRows(Array.from({ length: 5 }, (_, i) => emptyRow(Date.now() + i, String(maxSno + i + 1))));
       setInitialized(true);
     })();
@@ -263,8 +289,20 @@ export default function DeliveryStatementPage() {
       const [maxPage, maxSno] = await Promise.all([getMaxPageNo(), getMaxSno()]);
       setPageNo(String(maxPage + 1));
       setRows(Array.from({ length: 5 }, (_, i) => emptyRow(Date.now() + i, String(maxSno + i + 1))));
-    } catch (err: any) { toast.error(err.response?.data?.message || "Failed to save."); }
-    finally { setSaving(false); }
+      return true;
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to save.");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveAndPrint = async () => {
+    const success = await handleSave();
+    if (success) {
+      handlePrint();
+    }
   };
 
   const isMatch = (row: DsRow) => {
@@ -322,6 +360,10 @@ export default function DeliveryStatementPage() {
             <Button size="sm" onClick={handleSave} disabled={saving} className="h-9 px-4 rounded-lg font-medium transition-all bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-600">
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
               Save
+            </Button>
+
+            <Button size="sm" onClick={handleSaveAndPrint} disabled={saving} className="h-9 px-4 rounded-lg font-semibold transition-all bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-600">
+              <Save className="h-4 w-4 mr-2" /> Save & Print
             </Button>
 
             <Button size="sm" onClick={deleteLastRow} className="h-9 px-3 rounded-lg bg-slate-800 text-slate-200 hover:bg-orange-600 hover:text-white border border-slate-700 font-medium transition-all">

@@ -14,8 +14,9 @@ const summaryRowSchema = new mongoose.Schema({
   crossingFare: { type: String, default: "" },
   labor: { type: String, default: "" },
   deliveryCommission: { type: String, default: "" },
-  credit: { type: String, default: "" },
-  debit: { type: String, default: "" },
+  credit: { type: Number, default: 0 },
+  debit: { type: Number, default: 0 },
+  grandTotal: { type: Number, default: 0 },
   note: { type: String, default: "" }
 });
 

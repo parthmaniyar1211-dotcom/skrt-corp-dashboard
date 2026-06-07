@@ -61,9 +61,7 @@ export default function ChallanPage() {
     return map;
   }, [driverList]);
 
-  const [rows, setRows] = useState<ChallanRow[]>(
-    Array.from({ length: 5 }, (_, i) => emptyRow(i + 1))
-  );
+  const [rows, setRows] = useState<ChallanRow[]>([]);
 
   const rowMatches = (row: ChallanRow, q: string) => {
     if (!q.trim()) return false;
@@ -97,7 +95,6 @@ export default function ChallanPage() {
 
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [registerId, setRegisterId] = useState<string | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
 
   const getNextChallanNo = useCallback(async (): Promise<string> => {
@@ -174,87 +171,14 @@ export default function ChallanPage() {
     setFetchingGr(null);
   }, []);
 
-  // Fetch from Backend by Date
+  // Fetch next challan number on page load
   useEffect(() => {
     let active = true;
-    const fetchChallan = async () => {
-      if (!date) return;
-      try {
-        setLoading(true);
-        const res = await api.get(`/challan/date/${date}`);
-        if (res.data.success && res.data.data && active) {
-          const d = res.data.data;
-          setRegisterId(d._id);
-          setChallanNo(d.challanNo || "");
-          setFrom(d.from || "");
-          setVehicleNo(d.vehicleNo || "");
-          setOwnerName(d.ownerName || "");
-          setDriverName(d.driverName || "");
-          setCharges({
-            commission: d.commission || "",
-            labour: d.labour || "",
-            gr: d.gr || "",
-            crossing: d.crossing || "",
-            truckFreight: d.truckFreight || "",
-            advance: d.advance || "",
-            tfCredit: d.tfCredit || "",
-            totalToPay: d.totalToPay || "",
-            otherCharge: d.otherCharge || "",
-            lcdc: d.lcdc || "",
-            crossing2: d.crossing2 || "",
-            doorDelivery: d.doorDelivery || "",
-            balanceFreight: d.balanceFreight || "",
-            note: d.note || ""
-          });
-          const existingRows = (d.entries || []).map((e: any, i: number) => ({
-            id: Date.now() + i,
-            grNo: e.grNo || "",
-            pkg: e.pkg || "",
-            dest: e.dest || "",
-            content: e.content || "",
-            consignor: e.consignor || "",
-            consignee: e.consignee || "",
-            total: e.total || "",
-            wt: e.wt || ""
-          }));
-          if (existingRows.length > 0) setRows(existingRows);
-        }
-      } catch (err: any) {
-        if (err.response?.status === 404 && active) {
-          setRegisterId(null);
-          setChallanNo("");
-          setFrom("");
-          setVehicleNo("");
-          setOwnerName("");
-          setDriverName("");
-          setRows(Array.from({ length: 5 }, (_, i) => emptyRow(i + 1)));
-          setCharges({
-            commission: "",
-            labour: "",
-            gr: "",
-            crossing: "",
-            truckFreight: "",
-            advance: "",
-            tfCredit: "",
-            totalToPay: "",
-            otherCharge: "",
-            lcdc: "",
-            crossing2: "",
-            doorDelivery: "",
-            balanceFreight: "",
-            note: ""
-          });
-          getNextChallanNo().then(nextNo => {
-            if (active) setChallanNo(nextNo);
-          });
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-    fetchChallan();
+    getNextChallanNo().then(nextNo => {
+      if (active) setChallanNo(nextNo);
+    });
     return () => { active = false; };
-  }, [date, getNextChallanNo]);
+  }, [getNextChallanNo]);
 
   // Fetch driver list
   useEffect(() => {
@@ -303,44 +227,39 @@ export default function ChallanPage() {
         entries: rows.map(({ id, ...rest }) => rest),
         ...charges
       };
-      if (registerId) {
-        await api.put(`/challan/${registerId}`, payload);
-        toast.success("Challan updated successfully.");
-      } else {
-        const res = await api.post("/challan", payload);
-        if (res.data.success) {
-          toast.success("Challan saved successfully.");
-          
-          // Reset complete challan form
-          setRegisterId(null);
-          setFrom("");
-          setVehicleNo("");
-          setOwnerName("");
-          setDriverName("");
-          setCustomVehicle(false);
-          setCustomDriver(false);
-          setRows(Array.from({ length: 5 }, (_, i) => emptyRow(i + 1)));
-          setCharges({
-            commission: "",
-            labour: "",
-            gr: "",
-            crossing: "",
-            truckFreight: "",
-            advance: "",
-            tfCredit: "",
-            totalToPay: "",
-            otherCharge: "",
-            lcdc: "",
-            crossing2: "",
-            doorDelivery: "",
-            balanceFreight: "",
-            note: ""
-          });
+      
+      const res = await api.post("/challan", payload);
+      if (res.data.success) {
+        toast.success("Challan saved successfully.");
 
-          // Generate next challan number without page refresh
-          const nextNo = await getNextChallanNo();
-          setChallanNo(nextNo);
-        }
+        // Reset complete challan form to blank
+        setFrom("");
+        setVehicleNo("");
+        setOwnerName("");
+        setDriverName("");
+        setCustomVehicle(false);
+        setCustomDriver(false);
+        setRows([]); // Clear all table rows (0 rows)
+        setCharges({
+          commission: "",
+          labour: "",
+          gr: "",
+          crossing: "",
+          truckFreight: "",
+          advance: "",
+          tfCredit: "",
+          totalToPay: "",
+          otherCharge: "",
+          lcdc: "",
+          crossing2: "",
+          doorDelivery: "",
+          balanceFreight: "",
+          note: ""
+        });
+
+        // Generate next challan number without page refresh
+        const nextNo = await getNextChallanNo();
+        setChallanNo(nextNo);
       }
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to save challan.");

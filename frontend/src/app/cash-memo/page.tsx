@@ -111,8 +111,8 @@ export default function CashMemoPage() {
   }, [form.grNo]);
 
   const handleSave = async () => {
-    if (!form.drNo.trim()) { toast.error("D.R. No. is required"); return; }
-    if (!form.date) { toast.error("Date is required"); return; }
+    if (!form.drNo.trim()) { toast.error("D.R. No. is required"); return false; }
+    if (!form.date) { toast.error("Date is required"); return false; }
     setSaving(true);
     try {
       await api.post("/cash-memo", {
@@ -159,8 +159,10 @@ export default function CashMemoPage() {
 
       const next = await getNextDrNo();
       setForm({ ...initialForm, drNo: next, date: today() });
+      return true;
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Failed to save cash memo");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -259,6 +261,13 @@ export default function CashMemoPage() {
     pw.document.close();
   };
 
+  const handleSaveAndPrint = async () => {
+    const success = await handleSave();
+    if (success) {
+      handlePrint();
+    }
+  };
+
   return (
     <DashboardLayout>
       <style>{`
@@ -321,6 +330,14 @@ export default function CashMemoPage() {
               className="h-9 px-5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-2 transition-all"
             >
               <Printer className="h-4 w-4" /> Print
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSaveAndPrint}
+              disabled={saving}
+              className="h-9 px-5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-2 transition-all"
+            >
+              <Save className="h-4 w-4" /> Save & Print
             </Button>
             <Button
               size="sm"

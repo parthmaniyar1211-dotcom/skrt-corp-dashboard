@@ -112,15 +112,42 @@ export default function ShipmentsPage() {
     }
   };
 
+  const [highlightVal, setHighlightVal] = useState<string | null>(null);
+
   React.useEffect(() => {
     fetchShipments();
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const highlightParam = params.get("highlight");
+      if (highlightParam) {
+        setHighlightVal(highlightParam);
+      } else {
+        setHighlightVal(null);
+      }
+    }
   }, []);
 
+  React.useEffect(() => {
+    if (highlightVal && shipmentList.length > 0) {
+      const elementId = `row-shipment-${highlightVal}`;
+      const timer = setTimeout(() => {
+        const el = document.getElementById(elementId);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.add("animate-row-blink");
+          setTimeout(() => {
+            el.classList.remove("animate-row-blink");
+          }, 3000);
+        }
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightVal, shipmentList]);
+
   const exportCSV = () => {
-    const headers = ["Consignment No", "Vehicle", "Consignor", "Consignee", "Branch", "Package Type", "Quantity", "Charged Weight", "Payment Mode", "Freight", "Status", "Outgoing Status"];
+    const headers = ["Consignment No", "Consignor", "Consignee", "Branch", "Package Type", "Quantity", "Charged Weight", "Payment Mode", "Freight", "Status", "Outgoing Status"];
     const rows = filteredShipments.map((s: any) => [
       s.consignmentNumber || s.shipmentId || s.id || "",
-      s.vehicleNumber || "",
       s.consignor?.name || s.sender?.name || s.sender || "",
       s.consignee?.name || s.receiver?.name || s.receiver || "",
       s.toBranch || s.origin || "",
@@ -147,14 +174,18 @@ export default function ShipmentsPage() {
   };
 
   const filteredShipments = shipmentList.filter((s) => {
-    const lowerSearch = searchQuery.toLowerCase();
+    const lowerSearch = searchQuery.toLowerCase().trim();
     if (!lowerSearch) return true;
-    const idMatch = s.consignmentNumber?.toLowerCase().includes(lowerSearch) || false;
-    const consignorMatch = s.consignor?.name?.toLowerCase().includes(lowerSearch) || s.consignor?.gst?.toLowerCase().includes(lowerSearch) || false;
-    const consigneeMatch = s.consignee?.name?.toLowerCase().includes(lowerSearch) || s.consignee?.gst?.toLowerCase().includes(lowerSearch) || false;
-    const branchMatch = s.toBranch?.toLowerCase().includes(lowerSearch) || false;
-    const vehicleMatch = s.vehicleNumber?.toLowerCase().includes(lowerSearch) || false;
-    return idMatch || consignorMatch || consigneeMatch || branchMatch || vehicleMatch;
+    
+    const idMatch = String(s.consignmentNumber || s.shipmentId || s.id || "").toLowerCase().includes(lowerSearch);
+    
+    const consignorName = s.consignor?.name || s.sender?.name || s.sender || "";
+    const consignorMatch = String(consignorName).toLowerCase().includes(lowerSearch);
+    
+    const consigneeName = s.consignee?.name || s.receiver?.name || s.receiver || "";
+    const consigneeMatch = String(consigneeName).toLowerCase().includes(lowerSearch);
+    
+    return idMatch || consignorMatch || consigneeMatch;
   });
 
   const handleOutgoingStatusChange = useCallback(async (shipmentId: string, newStatus: string) => {
@@ -202,7 +233,7 @@ export default function ShipmentsPage() {
                 <td class="bold">GR No: ${shipment.consignmentNumber || '—'}</td>
               </tr>
               <tr>
-                <td class="bold">From: BHILWARA (BLW)</td>
+                <td class="bold">From: BHILWARA (BHL)</td>
                 <td class="bold">To: ${(shipment.toBranch || '—').toUpperCase()}</td>
               </tr>
             </table>
@@ -248,8 +279,8 @@ export default function ShipmentsPage() {
         </tr>
         <tr>
           <td colspan="2"><span class="bold">Private Number:</span> ${shipment.privateNumber || '—'}</td>
-          <td colspan="2"><span class="bold">EWB:</span> ${shipment.ewayParta || '—'}</td>
           <td colspan="2"><span class="bold">Value:</span> Rs.${shipment.invoiceValue || 0}</td>
+          <td colspan="2"><span class="bold">EWB:</span> ${shipment.ewayParta || '—'}</td>
           <td class="center bold">TOTAL</td>
           <td class="bold">Rs.${total}</td>
         </tr>
@@ -304,6 +335,16 @@ export default function ShipmentsPage() {
 
   return (
     <DashboardLayout>
+      <style>{`
+        @keyframes row-blink {
+          0%, 100% { background-color: transparent; }
+          25%, 75% { background-color: rgba(35, 136, 255, 0.4); }
+          50% { background-color: rgba(35, 136, 255, 0.15); }
+        }
+        .animate-row-blink {
+          animation: row-blink 1.2s ease-in-out 2 !important;
+        }
+      `}</style>
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -340,7 +381,6 @@ export default function ShipmentsPage() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent border-border/50">
                   <TableHead className="text-[10px] w-[13%]">Consignment No</TableHead>
-                  <TableHead className="text-[10px] w-[8%]">Vehicle</TableHead>
                   <TableHead className="text-[10px] w-[11%]">Consignor</TableHead>
                   <TableHead className="text-[10px] w-[11%]">Consignee</TableHead>
                   <TableHead className="text-[10px] w-[8%]">Branch</TableHead>
@@ -356,9 +396,8 @@ export default function ShipmentsPage() {
               </TableHeader>
               <TableBody>
                 {filteredShipments.map((shipment: any) => (
-                  <TableRow key={shipment._id || shipment.id} className="border-border/50 hover:bg-white/5 transition-colors">
+                  <TableRow key={shipment._id || shipment.id} id={`row-shipment-${shipment.consignmentNumber}`} className="border-border/50 hover:bg-white/5 transition-colors">
                     <TableCell className="font-medium text-primary text-[10px] whitespace-nowrap">{shipment.consignmentNumber || shipment.shipmentId || shipment.id}</TableCell>
-                    <TableCell className="font-mono text-[10px] text-foreground/90 font-bold whitespace-nowrap">{shipment.vehicleNumber || '-'}</TableCell>
                     <TableCell className="text-[10px] whitespace-nowrap">{shipment.consignor?.name || shipment.sender?.name || shipment.sender || '-'}</TableCell>
                     <TableCell className="text-[10px] whitespace-nowrap">{shipment.consignee?.name || shipment.receiver?.name || shipment.receiver || '-'}</TableCell>
                     <TableCell className="text-[10px] whitespace-nowrap">{shipment.toBranch || shipment.origin || '-'}</TableCell>

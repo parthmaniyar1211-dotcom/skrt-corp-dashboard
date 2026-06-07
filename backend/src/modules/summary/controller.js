@@ -31,6 +31,8 @@ exports.getById = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
+    const { entries } = req.body;
+    // Removed Credit/Debit exclusivity check
     const data = await SummaryRegister.create(req.body);
     res.status(201).json({ success: true, data });
   } catch (err) {
@@ -40,6 +42,8 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
+    const { entries } = req.body;
+    // Removed Credit/Debit exclusivity check
     const data = await SummaryRegister.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!data) return res.status(404).json({ success: false, message: "Record not found" });
     res.json({ success: true, data });

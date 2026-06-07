@@ -147,6 +147,7 @@ export default function SummaryPage() {
   const updateRow = (index: number, field: keyof SummaryRow, value: string) => {
     const newRows = [...rows];
     newRows[index] = { ...newRows[index], [field]: value };
+
     if (field === 'sno') {
       const newRows2 = [...newRows];
       const startNum = parseInt(newRows2[index].sno, 10);
@@ -189,11 +190,14 @@ export default function SummaryPage() {
   };
 
   const getSlipTotal = (r: SummaryRow) => {
-    return (parseFloat(r.fareDelivery) || 0) +
-      (parseFloat(r.crossing) || 0) +
-      (parseFloat(r.crossingFare) || 0) +
-      (parseFloat(r.labor) || 0) +
-      (parseFloat(r.deliveryCommission) || 0);
+    const fareDelivery = parseFloat(r.fareDelivery) || 0;
+    const crossingFare = parseFloat(r.crossingFare) || 0;
+    const deliveryCommission = parseFloat(r.deliveryCommission) || 0;
+    const crossing = parseFloat(r.crossing) || 0;
+    const labor = parseFloat(r.labor) || 0;
+    const credit = parseFloat(r.credit) || 0;
+    const debit = parseFloat(r.debit) || 0;
+    return fareDelivery + crossingFare + deliveryCommission - crossing - labor + credit - debit;
   };
 
   const buildSummaryHtml = () => {
@@ -209,13 +213,9 @@ export default function SummaryPage() {
       r.labor || r.deliveryCommission || r.credit || r.debit || r.note
     );
     const slipsHtml = filledRows.map((r, idx) => {
-      const rent = parseFloat(r.fareDelivery) || 0;
-      const crossing = parseFloat(r.crossing) || 0;
-      const crossRent = parseFloat(r.crossingFare) || 0;
-      const labor = parseFloat(r.labor) || 0;
-      const comm = parseFloat(r.deliveryCommission) || 0;
-      const subtotal = rent + crossing + crossRent + labor;
-      const total = subtotal + comm;
+      const credit = parseFloat(r.credit) || 0;
+      const debit = parseFloat(r.debit) || 0;
+      const total = getSlipTotal(r);
       return `
       <div class="slip-paper">
         <div class="slip-contacts">
@@ -342,12 +342,27 @@ export default function SummaryPage() {
     </div>
   </div>
 </div>
+<!-- NOTE (below Del. Commission, in Charges section) -->
+<div style="padding:4px 0;width:100%;">
+  <div style="display:flex;align-items:center;width:100%;gap:10px;font-size:14.5px;font-weight:700;">
+    <span style="white-space:nowrap;">Note</span>
+    <div style="flex:1;border-bottom:1px dotted #000;position:relative;height:24px;">
+      <span style="position:absolute;left:10px;top:-2px;padding:0 4px;">${r.note || '—'}</span>
+    </div>
+  </div>
+</div>
+<!-- ADJUSTMENTS separator -->
+<div style="display:flex;align-items:center;gap:8px;padding:6px 0 2px 0;">
+  <div style="flex:1;height:1px;background:rgba(0,0,0,0.15);"></div>
+  <span style="font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;opacity:0.5;">Adjustments</span>
+  <div style="flex:1;height:1px;background:rgba(0,0,0,0.15);"></div>
+</div>
 <!-- CREDIT -->
 <div style="padding:4px 0;width:100%;">
   <div style="display:flex;align-items:center;width:100%;gap:10px;font-size:14.5px;font-weight:700;">
     <span style="white-space:nowrap;">Credit</span>
     <div style="flex:1;border-bottom:1px dotted #000;position:relative;height:24px;">
-      <span style="position:absolute;left:10px;top:-2px;padding:0 4px;">₹ ${r.credit}</span>
+      <span style="position:absolute;left:10px;top:-2px;padding:0 4px;">${r.credit ? '₹ ' + r.credit : '—'}</span>
     </div>
   </div>
 </div>
@@ -356,17 +371,15 @@ export default function SummaryPage() {
   <div style="display:flex;align-items:center;width:100%;gap:10px;font-size:14.5px;font-weight:700;">
     <span style="white-space:nowrap;">Debit</span>
     <div style="flex:1;border-bottom:1px dotted #000;position:relative;height:24px;">
-      <span style="position:absolute;left:10px;top:-2px;padding:0 4px;">₹ ${r.debit}</span>
+      <span style="position:absolute;left:10px;top:-2px;padding:0 4px;">${r.debit ? '₹ ' + r.debit : '—'}</span>
     </div>
   </div>
 </div>
-<!-- NOTE -->
-<div style="padding:4px 0;width:100%;">
-  <div style="display:flex;align-items:center;width:100%;gap:10px;font-size:14.5px;font-weight:700;">
-    <span style="white-space:nowrap;">Note</span>
-    <div style="flex:1;border-bottom:1px dotted #000;position:relative;height:24px;">
-      <span style="position:absolute;left:10px;top:-2px;padding:0 4px;">${r.note}</span>
-    </div>
+<!-- GRAND TOTAL -->
+<div style="padding:8px 0;width:100%;border-top:1.5px solid var(--slip-ink-print);margin-top:10px;">
+  <div style="display:flex;align-items:center;width:100%;justify-content:space-between;font-size:16px;font-weight:900;">
+    <span style="text-transform:uppercase;letter-spacing:1px;">Grand Total</span>
+    <span>₹ ${total > 0 ? total.toFixed(2) : '—'}</span>
   </div>
 </div>
         </div>
@@ -515,16 +528,39 @@ export default function SummaryPage() {
         r.fareDelivery || r.crossing || r.crossingFare ||
         r.labor || r.deliveryCommission || r.credit || r.debit || r.note
       );
-      const entriesForApi = filledRows.map(({ id, ...rest }) => rest);
+
+      // Removed Credit/Debit exclusivity validation check
+
+      const entriesForApi = filledRows.map(({ id, ...rest }) => {
+        const credit = parseFloat(rest.credit) || 0;
+        const debit = parseFloat(rest.debit) || 0;
+        const grandTotal = getSlipTotal(rest as SummaryRow);
+        return {
+          ...rest,
+          credit,
+          debit,
+          grandTotal
+        };
+      });
+
       const payload = { date, entries: entriesForApi };
       await api.post("/summary", payload);
       toast.success("Summary saved successfully.");
       const maxSno = await getMaxSno();
       setRows(Array.from({ length: 1 }, (_, i) => emptyRow(Date.now() + i, String(maxSno + i + 1))));
+      return true;
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to save summary.");
+      return false;
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveAndPrint = async () => {
+    const success = await handleSave();
+    if (success) {
+      handlePrint();
     }
   };
 
@@ -586,6 +622,12 @@ export default function SummaryPage() {
             >
               {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
               Save
+            </Button>
+
+            <Button size="sm" onClick={handleSaveAndPrint} disabled={saving}
+              className="h-9 px-4 rounded-lg font-semibold transition-all bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-600"
+            >
+              <Save className="h-4 w-4 mr-1.5" /> Save & Print
             </Button>
 
             <Button size="sm" onClick={deleteLastRow} className="h-9 px-3 rounded-lg bg-slate-800 text-slate-200 hover:bg-orange-600 hover:text-white border border-slate-700 font-medium transition-all">
@@ -772,6 +814,9 @@ export default function SummaryPage() {
                     {/* Row: Delivery Commission (full width) */}
                     <SlipField label="Del. Commission" value={row.deliveryCommission} onChange={(e) => updateRow(idx, 'deliveryCommission', e.target.value)} placeholder="₹ 0" isCurrency />
 
+                    {/* Row: Note (full width, below Del. Commission) */}
+                    <SlipField label="Note" value={row.note} onChange={(e) => updateRow(idx, 'note', e.target.value)} placeholder="Optional note" />
+
                     {/* ── Extra fields separator ── */}
                     <div className="flex items-center gap-2 pt-2 pb-1">
                       <div className="flex-1 h-px bg-blue-900/30" />
@@ -783,7 +828,6 @@ export default function SummaryPage() {
                       <SlipField label="Credit" value={row.credit} onChange={(e) => updateRow(idx, 'credit', e.target.value)} placeholder="₹ 0" isCurrency />
                       <SlipField label="Debit" value={row.debit} onChange={(e) => updateRow(idx, 'debit', e.target.value)} placeholder="₹ 0" isCurrency />
                     </div>
-                    <SlipField label="Note" value={row.note} onChange={(e) => updateRow(idx, 'note', e.target.value)} placeholder="Optional note" />
                   </div>
 
                   {/* ── Grand Total ── */}

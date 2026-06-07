@@ -1,6 +1,97 @@
 const CashMemo = require('./model');
 const EntryRegister = require('../entry/model');
+const DSRegister = require('../delivery-statement/model');
 const sendResponse = require('../../utils/response');
+
+const getLocalDateString = (dateObj) => {
+  const d = new Date(dateObj);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const syncDeliveryStatementForDate = async (dateStr) => {
+  try {
+    const start = new Date(`${dateStr}T00:00:00.000Z`);
+    const end = new Date(`${dateStr}T23:59:59.999Z`);
+
+    const cashMemos = await CashMemo.find({
+      date: { $gte: start, $lte: end }
+    }).sort({ createdAt: 1 });
+
+    let dsRegister = await DSRegister.findOne({ dateSearch: dateStr });
+
+    if (cashMemos.length === 0) {
+      if (dsRegister) {
+        await DSRegister.findByIdAndDelete(dsRegister._id);
+      }
+      return;
+    }
+
+    const entries = cashMemos.map((cm, idx) => {
+      const freightVal = (cm.freight || 0) + (cm.freightPaise || 0) / 100;
+      const labourVal = (cm.labour || 0) + (cm.labourPaise || 0) / 100;
+      const stationeryVal = (cm.stationery || 0) + (cm.stationeryPaise || 0) / 100;
+      const commissionVal = (cm.commission || 0) + (cm.commissionPaise || 0) / 100;
+      const aocVal = (cm.aoc || 0) + (cm.aocPaise || 0) / 100;
+
+      return {
+        sno: String(idx + 1),
+        drNo: cm.drNo,
+        receiptNo: "",
+        freight: String(freightVal.toFixed(2)),
+        labour: String(labourVal.toFixed(2)),
+        receiptCh: String(stationeryVal.toFixed(2)),
+        dCom: String(commissionVal.toFixed(2)),
+        demurage: String(aocVal.toFixed(2))
+      };
+    });
+
+    const totals = entries.reduce(
+      (acc, e) => {
+        const fr = parseFloat(e.freight) || 0;
+        const lb = parseFloat(e.labour) || 0;
+        const rc = parseFloat(e.receiptCh) || 0;
+        const dc = parseFloat(e.dCom) || 0;
+        const dm = parseFloat(e.demurage) || 0;
+        const rowTot = fr + lb + rc + dc + dm;
+        return {
+          freight: acc.freight + fr,
+          labour: acc.labour + lb,
+          receiptCh: acc.receiptCh + rc,
+          dCom: acc.dCom + dc,
+          demurage: acc.demurage + dm,
+          total: acc.total + rowTot
+        };
+      },
+      { freight: 0, labour: 0, receiptCh: 0, dCom: 0, demurage: 0, total: 0 }
+    );
+
+    if (dsRegister) {
+      dsRegister.entries = entries;
+      dsRegister.totals = totals;
+      await dsRegister.save();
+    } else {
+      const allDs = await DSRegister.find();
+      let maxPage = 0;
+      for (const r of allDs) {
+        const pNum = parseInt(r.pageNo, 10);
+        if (!isNaN(pNum) && pNum > maxPage) maxPage = pNum;
+      }
+      const newPageNo = String(maxPage + 1);
+
+      await DSRegister.create({
+        pageNo: newPageNo,
+        dateSearch: dateStr,
+        entries,
+        totals
+      });
+    }
+  } catch (error) {
+    console.error("Error in syncDeliveryStatementForDate:", error);
+  }
+};
 
 // @desc    Create new cash memo
 // @route   POST /api/cash-memo
@@ -12,6 +103,10 @@ exports.createCashMemo = async (req, res) => {
       date: req.body.date ? new Date(req.body.date) : Date.now(),
       updatedAt: Date.now()
     });
+
+    // Sync delivery statement
+    const dateStr = getLocalDateString(memo.date);
+    await syncDeliveryStatementForDate(dateStr);
 
     // If grNo is provided, mark the matching entry as Complete
     if (req.body.grNo) {
@@ -65,12 +160,24 @@ exports.getCashMemoById = async (req, res) => {
 // @access  Private
 exports.updateCashMemo = async (req, res) => {
   try {
+    const oldMemo = await CashMemo.findById(req.params.id);
+    if (!oldMemo) return sendResponse(res, 404, false, 'Cash memo not found');
+
     const memo = await CashMemo.findByIdAndUpdate(
       req.params.id,
       { ...req.body, updatedAt: Date.now() },
       { new: true, runValidators: true }
     );
-    if (!memo) return sendResponse(res, 404, false, 'Cash memo not found');
+
+    // Sync old and new dates
+    const oldDateStr = getLocalDateString(oldMemo.date);
+    const newDateStr = getLocalDateString(memo.date);
+    
+    await syncDeliveryStatementForDate(oldDateStr);
+    if (oldDateStr !== newDateStr) {
+      await syncDeliveryStatementForDate(newDateStr);
+    }
+
     return sendResponse(res, 200, true, 'Cash memo updated successfully', memo);
   } catch (error) {
     return sendResponse(res, 500, false, error.message);
@@ -108,8 +215,15 @@ exports.getCashMemoByDrNo = async (req, res) => {
 // @access  Private
 exports.deleteCashMemo = async (req, res) => {
   try {
-    const memo = await CashMemo.findByIdAndDelete(req.params.id);
+    const memo = await CashMemo.findById(req.params.id);
     if (!memo) return sendResponse(res, 404, false, 'Cash memo not found');
+
+    const dateStr = getLocalDateString(memo.date);
+    await CashMemo.findByIdAndDelete(req.params.id);
+
+    // Sync after delete
+    await syncDeliveryStatementForDate(dateStr);
+
     return sendResponse(res, 200, true, 'Cash memo deleted successfully', null);
   } catch (error) {
     return sendResponse(res, 500, false, error.message);

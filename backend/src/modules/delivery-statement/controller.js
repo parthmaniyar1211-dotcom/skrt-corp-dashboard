@@ -31,6 +31,12 @@ exports.getById = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
+    const { dateSearch } = req.body;
+    let record = await DSRegister.findOne({ dateSearch });
+    if (record) {
+      record = await DSRegister.findByIdAndUpdate(record._id, req.body, { new: true, runValidators: true });
+      return res.status(200).json({ success: true, data: record });
+    }
     const newRecord = await DSRegister.create(req.body);
     res.status(201).json({ success: true, data: newRecord });
   } catch (error) {

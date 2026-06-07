@@ -4,12 +4,58 @@ import React, { useState, useEffect, useRef } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import { UserCircle, Search, X, Loader2, Box, FileText, Truck, Users, Package, MapPin } from "lucide-react";
+import { UserCircle, Search, X, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { HeaderProvider, useHeader } from "@/context/HeaderContext";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
+
+// ── Search field hints shown before user types ────────────────────────────
+const SEARCH_HINTS = [
+  {
+    emoji: "📦",
+    label: "Inventory",
+    color: "text-[#2388ff]",
+    badgeColor: "bg-[#2388ff]/10 text-[#2388ff] border-[#2388ff]/20",
+    fields: ["S.No.", "G.R. No.", "Delivery Receipt No."],
+  },
+  {
+    emoji: "🚚",
+    label: "Shipments",
+    color: "text-emerald-400",
+    badgeColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    fields: ["Consignment No.", "Vehicle", "Consignor", "Consignee"],
+  },
+  {
+    emoji: "📋",
+    label: "Challan Records",
+    color: "text-blue-400",
+    badgeColor: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    fields: ["Challan No.", "G.R. No.", "Driver"],
+  },
+  {
+    emoji: "💰",
+    label: "Cash Memo Records",
+    color: "text-amber-400",
+    badgeColor: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    fields: ["D.R. No.", "G.R. No."],
+  },
+  {
+    emoji: "📄",
+    label: "Summary",
+    color: "text-violet-400",
+    badgeColor: "bg-violet-500/10 text-violet-400 border-violet-500/20",
+    fields: ["No.", "Challan No.", "Driver"],
+  },
+  {
+    emoji: "🚛",
+    label: "Delivery Statement",
+    color: "text-rose-400",
+    badgeColor: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+    fields: ["Page No.", "S.No.", "D.R. No."],
+  },
+];
 
 function DashboardHeader() {
   const { user } = useAuth();
@@ -18,6 +64,7 @@ function DashboardHeader() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any>(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -25,10 +72,14 @@ function DashboardHeader() {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
+        setIsFocused(false);
       }
     };
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShowDropdown(false);
+      if (event.key === "Escape") {
+        setShowDropdown(false);
+        setIsFocused(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
@@ -55,15 +106,19 @@ function DashboardHeader() {
         }
       } else {
         setSearchResults(null);
-        setShowDropdown(false);
+        // Keep dropdown open (showing hints) if still focused
+        if (searchInput.trim().length === 0) {
+          setShowDropdown(isFocused);
+        }
       }
     }, 300);
     return () => clearTimeout(delayDebounceFn);
-  }, [searchInput]);
+  }, [searchInput, isFocused]);
 
   const handleSearch = () => {
     setSearchQuery(searchInput);
     setShowDropdown(false);
+    setIsFocused(false);
   };
 
   const handleClear = () => {
@@ -71,27 +126,45 @@ function DashboardHeader() {
     setSearchQuery("");
     setSearchResults(null);
     setShowDropdown(false);
+    setIsFocused(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleSearch();
   };
 
+  const handleFocus = () => {
+    setIsFocused(true);
+    setShowDropdown(true);
+  };
+
   const handleResultClick = (path: string, val: string) => {
     setSearchInput(val);
     setSearchQuery(val);
     setShowDropdown(false);
-    router.push(path);
+    setIsFocused(false);
+    router.push(`${path}?highlight=${encodeURIComponent(val)}`);
+  };
+
+  const handleRecordResultClick = (type: string, val: string) => {
+    setSearchInput(val);
+    setSearchQuery(val);
+    setShowDropdown(false);
+    setIsFocused(false);
+    router.push(`/fleet?tab=${type}&highlight=${encodeURIComponent(val)}`);
   };
 
   const hasResults = searchResults && (
-    searchResults.shipments?.length > 0 ||
-    searchResults.invoices?.length > 0 ||
-    searchResults.vehicles?.length > 0 ||
-    searchResults.clients?.length > 0 ||
     searchResults.inventory?.length > 0 ||
-    searchResults.tracking?.length > 0
+    searchResults.shipments?.length > 0 ||
+    searchResults.challans?.length > 0 ||
+    searchResults.cashMemos?.length > 0 ||
+    searchResults.summaries?.length > 0 ||
+    searchResults.deliveryStatements?.length > 0
   );
+
+  // Show the hints panel when focused + nothing meaningful typed yet
+  const showHints = showDropdown && searchInput.trim().length < 2 && !isSearching;
 
   return (
     <header className="h-16 border-b border-border bg-card/50 backdrop-blur-md sticky top-0 z-40 px-8 flex items-center justify-between">
@@ -108,7 +181,7 @@ function DashboardHeader() {
             placeholder="Quick search…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            onFocus={() => { if (hasResults || isSearching) setShowDropdown(true); }}
+            onFocus={handleFocus}
             onKeyDown={handleKeyDown}
             className="bg-secondary border-border w-[260px] text-sm h-9"
           />
@@ -130,94 +203,195 @@ function DashboardHeader() {
           )}
 
           {showDropdown && (
-            <div className="absolute top-full left-0 mt-2 w-[420px] bg-zinc-900 border border-zinc-700/60 rounded-xl shadow-2xl shadow-black/40 overflow-hidden z-50 max-h-[70vh] flex flex-col">
-              {isSearching ? (
+            <div className="absolute top-full left-0 mt-2 w-[480px] bg-zinc-900 border border-zinc-700/60 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50 max-h-[80vh] flex flex-col">
+
+              {/* ════════════════════════════════════════
+                  HINTS PANEL — shown when nothing typed
+                  ════════════════════════════════════════ */}
+              {showHints && (
+                <div className="p-3">
+                  {/* Header row */}
+                  <div className="flex items-center gap-2 px-1 pb-2 mb-1 border-b border-zinc-800">
+                    <Search className="w-3.5 h-3.5 text-slate-500" />
+                    <span className="text-[10px] font-bold uppercase tracking-[3px] text-slate-500">
+                      Quick Search — All Modules
+                    </span>
+                  </div>
+
+                  {/* Module rows */}
+                  <div className="mt-2 space-y-0.5">
+                    {SEARCH_HINTS.map((mod) => (
+                      <div
+                        key={mod.label}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-800/70 transition-colors"
+                      >
+                        {/* Emoji + module name */}
+                        <div className="flex items-center gap-1.5 w-[160px] shrink-0">
+                          <span className="text-sm leading-none">{mod.emoji}</span>
+                          <span className={`text-[11px] font-bold ${mod.color} whitespace-nowrap`}>
+                            {mod.label}
+                          </span>
+                        </div>
+
+                        {/* Field badges */}
+                        <div className="flex flex-wrap gap-1 min-w-0">
+                          {mod.fields.map((field) => (
+                            <span
+                              key={field}
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-semibold border ${mod.badgeColor} whitespace-nowrap`}
+                            >
+                              {field}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Footer tip */}
+                  <div className="mt-3 pt-2 border-t border-zinc-800 px-1 flex items-center gap-2">
+                    <kbd className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[9px] font-mono text-zinc-400">
+                      ↵ Enter
+                    </kbd>
+                    <span className="text-[10px] text-slate-600">
+                      Type 2+ characters to search all modules simultaneously
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* ════════════════════════════
+                  LOADING SPINNER
+                  ════════════════════════════ */}
+              {!showHints && isSearching && (
                 <div className="flex items-center justify-center p-6 text-muted-foreground">
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" /> Searching...
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" /> Searching all modules...
                 </div>
-              ) : hasResults ? (
-                <div className="overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-border/60">
-                  {searchResults.shipments?.length > 0 && (
-                    <div className="mb-3">
-                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 px-2 flex items-center gap-1.5"><Box className="w-3 h-3" /> Shipments</h4>
-                      {searchResults.shipments.map((s: any) => (
-                        <button key={s._id} onClick={() => handleResultClick('/shipments', s.consignmentNumber)} className="w-full text-left p-2 hover:bg-slate-800/80 rounded-lg transition-colors">
-                          <p className="text-sm font-semibold">{s.consignmentNumber}</p>
-                          <p className="text-[11px] text-muted-foreground">{s.consignor?.name || '?'} → {s.consignee?.name || '?'}</p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {searchResults.invoices?.length > 0 && (
-                    <div className="mb-3">
-                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 px-2 flex items-center gap-1.5"><FileText className="w-3 h-3" /> Invoices</h4>
-                      {searchResults.invoices.map((i: any) => (
-                        <button key={i._id} onClick={() => handleResultClick('/invoices', i.invoiceNo)} className="w-full text-left p-2 hover:bg-slate-800/80 rounded-lg transition-colors flex justify-between items-center">
-                          <div>
-                            <p className="text-sm font-semibold">{i.invoiceNo}</p>
-                            <p className="text-[11px] text-muted-foreground">{i.client?.name}</p>
-                          </div>
-                          <span className="text-xs font-bold text-emerald-400">₹{i.amount}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {searchResults.vehicles?.length > 0 && (
-                    <div className="mb-3">
-                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 px-2 flex items-center gap-1.5"><Truck className="w-3 h-3" /> Vehicles</h4>
-                      {searchResults.vehicles.map((v: any) => (
-                        <button key={v._id} onClick={() => handleResultClick('/fleet', v.vehicleNo)} className="w-full text-left p-2 hover:bg-slate-800/80 rounded-lg transition-colors flex justify-between items-center">
-                          <div>
-                            <p className="text-sm font-semibold">{v.vehicleNo}</p>
-                            <p className="text-[11px] text-muted-foreground">{v.model || v.type}</p>
-                          </div>
-                          <span className="text-[10px] px-2 py-0.5 bg-emerald-500/10 text-emerald-500 rounded-md border border-emerald-500/20">{v.status}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {searchResults.clients?.length > 0 && (
-                    <div className="mb-1">
-                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 px-2 flex items-center gap-1.5"><Users className="w-3 h-3" /> Clients</h4>
-                      {searchResults.clients.map((c: any) => (
-                        <button key={c._id} onClick={() => handleResultClick('/clients', c.name)} className="w-full text-left p-2 hover:bg-slate-800/80 rounded-lg transition-colors flex justify-between items-center">
-                          <div>
-                            <p className="text-sm font-semibold">{c.name}</p>
-                            <p className="text-[11px] text-muted-foreground">{c.phone || c.email || c.gstin}</p>
-                          </div>
-                          <span className="text-[10px] px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded-md border border-blue-500/20">Client</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+              )}
 
-                  {searchResults.inventory?.length > 0 && (
-                    <div className="mb-3">
-                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 px-2 flex items-center gap-1.5"><Package className="w-3 h-3" /> Inventory</h4>
-                      {searchResults.inventory.map((i: any) => (
-                        <button key={i._id} onClick={() => handleResultClick('/inventory', i.lrNo)} className="w-full text-left p-2 hover:bg-slate-800/80 rounded-lg transition-colors">
-                          <p className="text-sm font-semibold">{i.lrNo}</p>
-                          <p className="text-[11px] text-muted-foreground">{i.cargoName} · {i.senderName} → {i.receiverName}</p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+              {!showHints && !isSearching && searchResults && (
+                <div className="overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-border/60 space-y-4 max-h-[60vh]">
+                  {/* Module 1: Inventory */}
+                  <div className="border-b border-zinc-800/60 pb-3">
+                    <h4 className="text-[11px] font-bold uppercase tracking-widest text-[#2388ff] mb-1.5 px-2 flex items-center justify-between">
+                      <span>📦 Inventory</span>
+                      <span className="text-[9px] text-zinc-500 normal-case tracking-normal">S.No · G.R. No · Delivery Receipt No</span>
+                    </h4>
+                    {searchResults.inventory?.length > 0 ? (
+                      <div className="space-y-0.5">
+                        {searchResults.inventory.map((i: any) => (
+                          <button key={i._id} onClick={() => handleResultClick('/inventory', i.searchVal || i.lrNo)} className="w-full text-left p-2 hover:bg-zinc-800/50 rounded-lg transition-colors block">
+                            <p className="text-xs font-semibold text-white">{i.title || i.lrNo}</p>
+                            {i.subtitle && <p className="text-[10px] text-zinc-500">{i.subtitle}</p>}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-zinc-600 italic px-2">No matching records found</p>
+                    )}
+                  </div>
 
-                  {searchResults.tracking?.length > 0 && (
-                    <div className="mb-1">
-                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 px-2 flex items-center gap-1.5"><MapPin className="w-3 h-3" /> Tracking</h4>
-                      {searchResults.tracking.map((t: any) => (
-                        <button key={t._id} onClick={() => handleResultClick('/tracking', t.vehicle?.vehicleNo || '')} className="w-full text-left p-2 hover:bg-slate-800/80 rounded-lg transition-colors">
-                          <p className="text-sm font-semibold">{t.vehicle?.vehicleNo || 'Unknown'}</p>
-                          <p className="text-[11px] text-muted-foreground">{t.currentLocation?.address || 'No location'}</p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  {/* Module 2: Shipments */}
+                  <div className="border-b border-zinc-800/60 pb-3">
+                    <h4 className="text-[11px] font-bold uppercase tracking-widest text-emerald-400 mb-1.5 px-2 flex items-center justify-between">
+                      <span>🚚 Shipments</span>
+                      <span className="text-[9px] text-zinc-500 normal-case tracking-normal">Consignment No · Vehicle · Consignor · Consignee</span>
+                    </h4>
+                    {searchResults.shipments?.length > 0 ? (
+                      <div className="space-y-0.5">
+                        {searchResults.shipments.map((s: any) => (
+                          <button key={s._id} onClick={() => handleResultClick('/shipments', s.searchVal || s.consignmentNumber)} className="w-full text-left p-2 hover:bg-zinc-800/50 rounded-lg transition-colors block">
+                            <p className="text-xs font-semibold text-white">{s.title || s.consignmentNumber}</p>
+                            {s.subtitle && <p className="text-[10px] text-zinc-500">{s.subtitle}</p>}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-zinc-600 italic px-2">No matching records found</p>
+                    )}
+                  </div>
+
+                  {/* Module 3: Challan Records */}
+                  <div className="border-b border-zinc-800/60 pb-3">
+                    <h4 className="text-[11px] font-bold uppercase tracking-widest text-blue-400 mb-1.5 px-2 flex items-center justify-between">
+                      <span>📋 Challan Records</span>
+                      <span className="text-[9px] text-zinc-500 normal-case tracking-normal">Challan No · G.R. No · Driver</span>
+                    </h4>
+                    {searchResults.challans?.length > 0 ? (
+                      <div className="space-y-0.5">
+                        {searchResults.challans.map((r: any) => (
+                          <button key={r._id} onClick={() => handleRecordResultClick('challan', r.searchVal)} className="w-full text-left p-2 hover:bg-zinc-800/50 rounded-lg transition-colors block">
+                            <p className="text-xs font-semibold text-white">{r.title}</p>
+                            {r.subtitle && <p className="text-[10px] text-zinc-500">{r.subtitle}</p>}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-zinc-600 italic px-2">No matching records found</p>
+                    )}
+                  </div>
+
+                  {/* Module 4: Cash Memo Records */}
+                  <div className="border-b border-zinc-800/60 pb-3">
+                    <h4 className="text-[11px] font-bold uppercase tracking-widest text-amber-400 mb-1.5 px-2 flex items-center justify-between">
+                      <span>💰 Cash Memo Records</span>
+                      <span className="text-[9px] text-zinc-500 normal-case tracking-normal">D.R. No · G.R. No</span>
+                    </h4>
+                    {searchResults.cashMemos?.length > 0 ? (
+                      <div className="space-y-0.5">
+                        {searchResults.cashMemos.map((r: any) => (
+                          <button key={r._id} onClick={() => handleRecordResultClick('cash-memo', r.searchVal)} className="w-full text-left p-2 hover:bg-zinc-800/50 rounded-lg transition-colors block">
+                            <p className="text-xs font-semibold text-white">{r.title}</p>
+                            {r.subtitle && <p className="text-[10px] text-zinc-500">{r.subtitle}</p>}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-zinc-600 italic px-2">No matching records found</p>
+                    )}
+                  </div>
+
+                  {/* Module 5: Summary */}
+                  <div className="border-b border-zinc-800/60 pb-3">
+                    <h4 className="text-[11px] font-bold uppercase tracking-widest text-violet-400 mb-1.5 px-2 flex items-center justify-between">
+                      <span>📄 Summary</span>
+                      <span className="text-[9px] text-zinc-500 normal-case tracking-normal">No. · Challan No · Driver</span>
+                    </h4>
+                    {searchResults.summaries?.length > 0 ? (
+                      <div className="space-y-0.5">
+                        {searchResults.summaries.map((r: any) => (
+                          <button key={r._id} onClick={() => handleRecordResultClick('summary', r.searchVal)} className="w-full text-left p-2 hover:bg-zinc-800/50 rounded-lg transition-colors block">
+                            <p className="text-xs font-semibold text-white">{r.title}</p>
+                            {r.subtitle && <p className="text-[10px] text-zinc-500">{r.subtitle}</p>}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-zinc-600 italic px-2">No matching records found</p>
+                    )}
+                  </div>
+
+                  {/* Module 6: Delivery Statement */}
+                  <div className="pb-1">
+                    <h4 className="text-[11px] font-bold uppercase tracking-widest text-rose-400 mb-1.5 px-2 flex items-center justify-between">
+                      <span>🚛 Delivery Statement</span>
+                      <span className="text-[9px] text-zinc-500 normal-case tracking-normal">Page No · S.No · D.R. No</span>
+                    </h4>
+                    {searchResults.deliveryStatements?.length > 0 ? (
+                      <div className="space-y-0.5">
+                        {searchResults.deliveryStatements.map((r: any) => (
+                          <button key={r._id} onClick={() => handleRecordResultClick('delivery-statement', r.searchVal)} className="w-full text-left p-2 hover:bg-zinc-800/50 rounded-lg transition-colors block">
+                            <p className="text-xs font-semibold text-white">{r.title}</p>
+                            {r.subtitle && <p className="text-[10px] text-zinc-500">{r.subtitle}</p>}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-zinc-600 italic px-2">No matching records found</p>
+                    )}
+                  </div>
                 </div>
-              ) : searchInput.trim().length >= 2 ? (
-                <div className="p-6 text-center text-sm text-muted-foreground">No results found for "{searchInput}"</div>
-              ) : null}
+              )}
             </div>
           )}
         </div>

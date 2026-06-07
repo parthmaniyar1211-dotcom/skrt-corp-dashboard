@@ -68,11 +68,12 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    // Allow any vercel.app subdomain (covers all Vercel preview + production deployments)
+    if (origin.endsWith('.vercel.app')) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true
 }));
@@ -165,32 +166,5 @@ app.use((err, req, res, next) => {
       : err.message
   });
 });
-
-// ─── Local Dev Server (only when NOT on Vercel) ───────────────────────────────
-// Vercel imports this file directly — do NOT call listen() on Vercel
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  const http = require('http');
-  const socketio = require('socket.io');
-  const server = http.createServer(app);
-  const io = socketio(server, {
-    cors: { origin: '*', methods: ['GET', 'POST'] }
-  });
-  io.on('connection', (socket) => {
-    console.log('🔌 New client connected:', socket.id);
-    socket.on('join_shipment', (id) => socket.join(id));
-    socket.on('update_location', (data) => io.to(data.shipmentId).emit('location_updated', data.location));
-    socket.on('disconnect', () => console.log('🔌 Client disconnected'));
-  });
-  app.set('io', io);
-
-  // Connect DB eagerly for local dev
-  connectDB().then(() => {
-    const PORT = process.env.PORT || 5000;
-    server.listen(PORT, () => console.log(`\n🚀 SKRT Server running on port ${PORT}`));
-  }).catch(err => {
-    console.error('❌ Cannot start server:', err.message);
-    process.exit(1);
-  });
-}
 
 module.exports = app;

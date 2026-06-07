@@ -53,7 +53,20 @@ export default function InventoryPage() {
     }
   }, []);
 
-  useEffect(() => { fetchEntries(); }, [fetchEntries]);
+  const [highlightVal, setHighlightVal] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchEntries();
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const highlightParam = params.get("highlight");
+      if (highlightParam) {
+        setHighlightVal(highlightParam);
+      } else {
+        setHighlightVal(null);
+      }
+    }
+  }, [fetchEntries]);
 
   const filtered = useMemo(() => {
     const sorted = [...allEntries].sort((a, b) => {
@@ -72,6 +85,31 @@ export default function InventoryPage() {
       String(e.deliveryReceiptNo || "").toLowerCase().includes(q)
     );
   }, [allEntries, searchQuery, localSearch]);
+
+  useEffect(() => {
+    if (highlightVal && allEntries.length > 0) {
+      const matchedIdx = filtered.findIndex(
+        e => e.grNo === highlightVal || e.deliveryReceiptNo === highlightVal || e.sno === highlightVal
+      );
+      if (matchedIdx !== -1) {
+        const matchPage = Math.floor(matchedIdx / PER_PAGE) + 1;
+        setPage(matchPage);
+
+        const timer = setTimeout(() => {
+          const elementId = `row-inventory-${highlightVal}`;
+          const el = document.getElementById(elementId);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.classList.add("animate-row-blink");
+            setTimeout(() => {
+              el.classList.remove("animate-row-blink");
+            }, 3000);
+          }
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [highlightVal, allEntries, filtered]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const currentPage = Math.min(page, totalPages);
@@ -169,6 +207,16 @@ export default function InventoryPage() {
 
   return (
     <DashboardLayout>
+      <style>{`
+        @keyframes row-blink {
+          0%, 100% { background-color: transparent; }
+          25%, 75% { background-color: rgba(35, 136, 255, 0.4); }
+          50% { background-color: rgba(35, 136, 255, 0.15); }
+        }
+        .animate-row-blink {
+          animation: row-blink 1.2s ease-in-out 2 !important;
+        }
+      `}</style>
       <div className="space-y-6 px-8 py-8 h-full max-w-full">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div>
@@ -266,6 +314,15 @@ export default function InventoryPage() {
                     {paginated.map((entry: any, idx: number) => (
                       <tr
                         key={entry._id || idx}
+                        id={
+                          entry.grNo === highlightVal
+                            ? `row-inventory-${entry.grNo}`
+                            : entry.deliveryReceiptNo === highlightVal
+                            ? `row-inventory-${entry.deliveryReceiptNo}`
+                            : entry.sno === highlightVal
+                            ? `row-inventory-${entry.sno}`
+                            : undefined
+                        }
                         onClick={() => { setSelectedEntry(entry); setDialogOpen(true); }}
                         className={`cursor-pointer hover:bg-slate-800/40 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-900/40'}`}
                       >
