@@ -356,6 +356,7 @@ export default function CashMemoPage() {
                 label="Share"
               />
             )}
+          </div>
         </div>
 
         {/* Receipt card container */}
