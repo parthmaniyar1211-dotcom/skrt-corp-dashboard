@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { useHeader } from "@/context/HeaderContext";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
 const today = () => {
   const d = new Date();
@@ -95,6 +96,7 @@ export default function ChallanPage() {
 
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [lastSavedId, setLastSavedId] = useState<string | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
 
   const getNextChallanNo = useCallback(async (): Promise<string> => {
@@ -230,6 +232,7 @@ export default function ChallanPage() {
       
       const res = await api.post("/challan", payload);
       if (res.data.success) {
+        if (res.data.data?._id) setLastSavedId(res.data.data._id);
         toast.success("Challan saved successfully.");
 
         // Reset complete challan form to blank
@@ -471,6 +474,13 @@ export default function ChallanPage() {
             >
               <Download className="h-4 w-4" /> Download PDF
             </Button>
+            {lastSavedId && (
+              <WhatsAppShareButton
+                recordType="challan"
+                recordId={lastSavedId}
+                label="Share"
+              />
+            )}
           </div>
         </div>
 

@@ -1,630 +1,865 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { 
-  FileText, 
-  Download, 
-  Printer, 
-  Filter, 
-  CreditCard, 
-  Calendar,
-  Plus,
-  Loader2,
-  Calculator,
-  TrendingUp,
-  AlertCircle
+import {
+  FileText, Download, Printer, Calendar, Calculator,
+  TrendingUp, TrendingDown, Loader2, RefreshCw, ChevronDown,
+  BarChart3, Users, Filter, AlertCircle
 } from "lucide-react";
-
 import api from "@/lib/api";
-import { CreateInvoiceDialog } from "@/components/invoices/CreateInvoiceDialog";
-import { cn } from "@/lib/utils";
-import { useHeader } from "@/context/HeaderContext";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
-const getLocalDateString = (d: Date = new Date()) => {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
+/* ─── helpers ─── */
+const getLocalDate = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-const getFirstDayOfMonthString = () => {
+const getFirstOfMonth = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 };
 
-export default function InvoicesPage() {
-  const { searchQuery } = useHeader();
-  
-  // Basic states
-  const [invoiceList, setInvoiceList] = useState<any[]>([]);
-  const [invoicesLoading, setInvoicesLoading] = useState(true);
-  
-  // Date range for aggregation
-  const [startDate, setStartDate] = useState(getFirstDayOfMonthString());
-  const [endDate, setEndDate] = useState(getLocalDateString());
-  
-  // Data for aggregation
-  const [summaries, setSummaries] = useState<any[]>([]);
-  const [deliveryStatements, setDeliveryStatements] = useState<any[]>([]);
-  const [aggLoading, setAggLoading] = useState(false);
+const fmtDate = (s: string) => {
+  if (!s) return "—";
+  const p = s.split("-");
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : s;
+};
 
-  const fetchInvoices = async () => {
-    try {
-      setInvoicesLoading(true);
-      const { data } = await api.get("/invoices");
-      if (data.success) {
-        setInvoiceList(data.data || []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch invoices", error);
-    } finally {
-      setInvoicesLoading(false);
-    }
-  };
+const fmtINR = (n: number) =>
+  `₹ ${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const fetchAggregationData = async () => {
-    try {
-      setAggLoading(true);
-      const [sumRes, dsRes] = await Promise.all([
-        api.get("/summary"),
-        api.get("/delivery-statement")
-      ]);
-      if (sumRes.data.success) setSummaries(sumRes.data.data || []);
-      if (dsRes.data.success) setDeliveryStatements(dsRes.data.data || []);
-    } catch (error) {
-      console.error("Failed to fetch aggregation data", error);
-      toast.error("Failed to fetch ledger data for calculation");
-    } finally {
-      setAggLoading(false);
-    }
-  };
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
 
-  useEffect(() => {
-    fetchInvoices();
-    fetchAggregationData();
-  }, []);
+/* ─── tab IDs ─── */
+type Tab = "summary" | "delivery" | "combined";
 
-  // Filtered lists by search query
-  const filteredInvoices = useMemo(() => {
-    if (!searchQuery.trim()) return invoiceList;
-    const q = searchQuery.toLowerCase();
-    return invoiceList.filter(inv =>
-      String(inv.invoiceNo || "").toLowerCase().includes(q) ||
-      String(inv.client?.name || "").toLowerCase().includes(q) ||
-      String(inv.shipment?.shipmentId || "").toLowerCase().includes(q) ||
-      String(inv.status || "").toLowerCase().includes(q)
-    );
-  }, [invoiceList, searchQuery]);
+/* ─────────────────────────────────────────────────────────────
+   PRINT HELPERS
+───────────────────────────────────────────────────────────── */
+function printHtml(html: string) {
+  const pw = window.open("", "_blank");
+  if (!pw) return;
+  pw.document.write(html);
+  pw.document.close();
+}
 
-  // Aggregate values based on Selected Date Range
-  const aggregatedValues = useMemo(() => {
-    // 1. Filter Summary entries by date range
-    const filteredSummaries = summaries.filter(reg => {
-      const dateStr = (reg.date || "").split('T')[0];
-      return dateStr >= startDate && dateStr <= endDate;
-    });
+function downloadPdfHtml(html: string, filename: string) {
+  const withScript = html.replace(
+    "</body>",
+    `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
+<script>window.onload=function(){html2pdf().set({margin:8,filename:'${filename}.pdf',html2canvas:{scale:2},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(document.body).save();};<\/script></body>`
+  );
+  const pw = window.open("", "_blank");
+  if (!pw) return;
+  pw.document.write(withScript);
+  pw.document.close();
+}
 
-    let summaryCredit = 0;
-    let summaryDebit = 0;
+/* ─── base print HTML wrapper ─── */
+function basePrintWrapper(title: string, content: string, meta = "") {
+  return `<!DOCTYPE html><html lang="en"><head>
+  <meta charset="UTF-8">
+  <title>${title}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Arial',sans-serif;background:#fff;color:#111;padding:30px;font-size:13px}
+    .header{text-align:center;border-bottom:2px solid #1a3a6b;padding-bottom:18px;margin-bottom:22px}
+    .header h1{font-size:22px;font-weight:900;text-transform:uppercase;color:#1a3a6b;letter-spacing:.5px}
+    .header h2{font-size:14px;color:#555;margin-top:3px}
+    .header .badge{display:inline-block;margin-top:8px;padding:3px 16px;border:1.5px solid #1a3a6b;border-radius:4px;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:2px;color:#1a3a6b}
+    .meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:18px;font-size:12px;color:#444;font-weight:600}
+    table{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:12px}
+    th{background:#e8ecf0;border:1px solid #bbb;padding:7px 8px;font-weight:700;text-transform:uppercase;font-size:10.5px;text-align:left}
+    td{border:1px solid #ccc;padding:6px 8px}
+    .tr{text-align:right}
+    .tc{text-align:center}
+    .totals-row td{background:#f0f4f8;font-weight:700;border-top:2px solid #1a3a6b}
+    .summary-box{display:flex;gap:20px;margin-top:20px}
+    .sum-card{flex:1;border:1.5px solid #ddd;border-radius:6px;padding:12px;text-align:center}
+    .sum-card .label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#777;margin-bottom:4px}
+    .sum-card .amount{font-size:18px;font-weight:900}
+    .credit{color:#10b981}.debit{color:#ef4444}.net{color:#1a3a6b}
+    .section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#1a3a6b;border-bottom:1.5px solid #1a3a6b;padding-bottom:6px;margin:20px 0 10px}
+    .footer{margin-top:50px;display:flex;justify-content:space-between;font-size:12px;font-weight:700;border-top:1px solid #ccc;padding-top:14px}
+    .no-print{text-align:center;margin-bottom:20px}
+    .no-print button{background:#1a3a6b;color:#fff;border:none;padding:9px 28px;border-radius:5px;font-size:13px;font-weight:600;cursor:pointer}
+    @media print{.no-print{display:none}.sum-card{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+  </style></head><body>
+  <div class="no-print"><button onclick="window.print()">🖨️ Print</button></div>
+  <div class="header">
+    <h1>Sant Kanwar Ram Transport Corporation</h1>
+    <h2>Bhilwara – 311001 (Rajasthan)</h2>
+    ${meta}
+  </div>
+  ${content}
+  <div class="footer">
+    <span>Prepared by: SKRT ERP System</span>
+    <span>Authorised Signatory: _______________________</span>
+  </div>
+  </body></html>`;
+}
 
-    filteredSummaries.forEach(reg => {
-      (reg.entries || []).forEach((e: any) => {
-        summaryCredit += parseFloat(e.credit) || 0;
-        summaryDebit += parseFloat(e.debit) || 0;
-      });
-    });
+/* ─────────────────────────────────────────────────────────────
+   STAT CARD
+───────────────────────────────────────────────────────────── */
+function StatCard({ label, value, color, icon: Icon }: {
+  label: string; value: string; color: string; icon: any;
+}) {
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${color}/20`}>
+        <Icon className={`w-5 h-5 ${color}`} />
+      </div>
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{label}</p>
+        <p className={`text-lg font-black font-mono mt-0.5 ${color}`}>{value}</p>
+      </div>
+    </div>
+  );
+}
 
-    // 2. Filter Delivery Statements by date range
-    const filteredDS = deliveryStatements.filter(reg => {
-      const dateStr = (reg.dateSearch || "").split('T')[0];
-      return dateStr >= startDate && dateStr <= endDate;
-    });
+/* ─────────────────────────────────────────────────────────────
+   FILTER BAR
+───────────────────────────────────────────────────────────── */
+function FilterBar({
+  startDate, endDate, onStartDate, onEndDate,
+  transportName, onTransportName, transportNames,
+  onApply, loading
+}: any) {
+  const [selMonth, setSelMonth] = useState("");
 
-    let dsFreight = 0;
-    let dsLabour = 0;
-    let dsStationery = 0;
-    let dsCommission = 0;
-    let dsDemurrage = 0;
-
-    filteredDS.forEach(reg => {
-      (reg.entries || []).forEach((e: any) => {
-        dsFreight += parseFloat(e.freight) || 0;
-        dsLabour += parseFloat(e.labour) || 0;
-        dsStationery += parseFloat(e.receiptCh) || 0;
-        dsCommission += parseFloat(e.dCom) || 0;
-        dsDemurrage += parseFloat(e.demurage) || 0;
-      });
-    });
-
-    const totalCredits = summaryCredit + dsFreight;
-    const totalDebits = summaryDebit + dsLabour + dsStationery + dsCommission + dsDemurrage;
-    const netReceivable = totalCredits - totalDebits;
-
-    return {
-      summaryCredit,
-      summaryDebit,
-      dsFreight,
-      dsLabour,
-      dsStationery,
-      dsCommission,
-      dsDemurrage,
-      totalCredits,
-      totalDebits,
-      netReceivable,
-      summariesCount: filteredSummaries.length,
-      dsCount: filteredDS.length
-    };
-  }, [summaries, deliveryStatements, startDate, endDate]);
-
-  const totalBilled = filteredInvoices.reduce((acc, curr) => acc + curr.total, 0);
-  const pendingAmount = filteredInvoices.filter(inv => inv.status === 'unpaid').reduce((acc, curr) => acc + curr.total, 0);
-  const paidAmount = filteredInvoices.filter(inv => inv.status === 'paid').reduce((acc, curr) => acc + curr.total, 0);
-
-  const formatDateDisplay = (dateStr: string) => {
-    if (!dateStr) return "";
-    const p = dateStr.split("-");
-    return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dateStr;
-  };
-
-  const getPrintStatementHTML = () => {
-    const values = aggregatedValues;
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>SKRT ERP - Aggregated Invoice Statement</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 30px; color: #111; background: #fff; line-height: 1.5; }
-          .header { text-align: center; border-bottom: 2px solid #2388ff; padding-bottom: 15px; margin-bottom: 25px; }
-          .header h1 { font-size: 26px; color: #2388ff; margin: 0; text-transform: uppercase; font-weight: 900; }
-          .header p { margin: 5px 0 0 0; font-size: 13px; color: #555; }
-          .metadata { display: flex; justify-content: space-between; margin-bottom: 30px; font-size: 14px; }
-          .statement-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-          .statement-table th { background: #f2f4f7; padding: 10px; border: 1px solid #ddd; text-align: left; font-weight: bold; }
-          .statement-table td { padding: 10px; border: 1px solid #ddd; }
-          .section-title { font-weight: bold; background: #eaedf1; }
-          .num { text-align: right; font-family: monospace; font-size: 14px; }
-          .net-payable { font-size: 18px; font-weight: 900; color: #2388ff; border-top: 2.5px solid #2388ff; }
-          .footer { margin-top: 60px; display: flex; justify-content: space-between; font-size: 13px; font-weight: bold; }
-        </style>
-      </head>
-      <body onload="window.print();">
-        <div class="header">
-          <h1>SANT KANWAR RAM TRANSPORT CORP.</h1>
-          <p>Reconciliation Invoice Statement</p>
-          <p>Period: ${formatDateDisplay(startDate)} to ${formatDateDisplay(endDate)}</p>
-        </div>
-        <div class="metadata">
-          <div><strong>Report Generated:</strong> ${new Date().toLocaleString()}</div>
-          <div><strong>Registers Count:</strong> Summary: ${values.summariesCount} | DS: ${values.dsCount}</div>
-        </div>
-        
-        <table class="statement-table">
-          <thead>
-            <tr>
-              <th>Account Details & Breakdown</th>
-              <th style="text-align:right; width: 25%;">Credits (Revenue)</th>
-              <th style="text-align:right; width: 25%;">Debits (Expenses)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- Summary Values -->
-            <tr class="section-title">
-              <td colspan="3">A. Summary Register Adjustments</td>
-            </tr>
-            <tr>
-              <td>Summary Credit</td>
-              <td class="num">₹ ${values.summaryCredit.toFixed(2)}</td>
-              <td class="num">—</td>
-            </tr>
-            <tr>
-              <td>Summary Debit</td>
-              <td class="num">—</td>
-              <td class="num">₹ ${values.summaryDebit.toFixed(2)}</td>
-            </tr>
-
-            <!-- Delivery Statement Values -->
-            <tr class="section-title">
-              <td colspan="3">B. Delivery Statement Ledger</td>
-            </tr>
-            <tr>
-              <td>Freight (Revenue Credit)</td>
-              <td class="num">₹ ${values.dsFreight.toFixed(2)}</td>
-              <td class="num">—</td>
-            </tr>
-            <tr>
-              <td>Labour (Expense Debit)</td>
-              <td class="num">—</td>
-              <td class="num">₹ ${values.dsLabour.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>Stationery (Expense Debit)</td>
-              <td class="num">—</td>
-              <td class="num">₹ ${values.dsStationery.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>Commission (Expense Debit)</td>
-              <td class="num">—</td>
-              <td class="num">₹ ${values.dsCommission.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>A.O.C (Expense Debit)</td>
-              <td class="num">—</td>
-              <td class="num">₹ ${values.dsDemurrage.toFixed(2)}</td>
-            </tr>
-
-            <!-- Totals -->
-            <tr style="font-weight: bold; background: #f9fbfd;">
-              <td>SUBTOTALS</td>
-              <td class="num" style="color: #10b981; font-weight: bold;">₹ ${values.totalCredits.toFixed(2)}</td>
-              <td class="num" style="color: #ef4444; font-weight: bold;">₹ ${values.totalDebits.toFixed(2)}</td>
-            </tr>
-
-            <!-- Grand Total -->
-            <tr class="net-payable">
-              <td>NET RECONCILED AMOUNT (Receivable)</td>
-              <td colspan="2" class="num" style="font-size: 20px; font-weight: 900; color: #2388ff;">₹ ${values.netReceivable.toFixed(2)}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div class="footer">
-          <div>Prepared By: SKRT ERP System</div>
-          <div>Authorized Signature: _________________________</div>
-        </div>
-      </body>
-      </html>
-    `;
-  };
-
-  const handlePrintStatement = () => {
-    const pw = window.open("", "_blank");
-    if (!pw) return;
-    pw.document.write(getPrintStatementHTML());
-    pw.document.close();
-  };
-
-  const handleDownloadPDFStatement = () => {
-    const pw = window.open("", "_blank");
-    if (!pw) return;
-    const html = getPrintStatementHTML().replace("</body>", `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
-<script>window.onload=function(){html2pdf().set({margin:5,filename:'reconciliation-statement.pdf'}).from(document.body).save();};<\/script></body>`);
-    pw.document.write(html);
-    pw.document.close();
+  const applyMonth = (val: string) => {
+    setSelMonth(val);
+    if (!val) return;
+    const [y, m] = val.split("-").map(Number);
+    const start = `${y}-${String(m).padStart(2, "0")}-01`;
+    const lastDay = new Date(y, m, 0).getDate();
+    const end = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    onStartDate(start);
+    onEndDate(end);
   };
 
   return (
+    <div className="flex flex-wrap items-center gap-2 p-4 bg-slate-900/40 rounded-xl border border-slate-800">
+      <Filter className="w-4 h-4 text-slate-500 shrink-0" />
+
+      {/* Month picker */}
+      <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs">
+        <Calendar className="w-3.5 h-3.5 text-[#2388ff]" />
+        <span className="text-slate-400 font-semibold">Month:</span>
+        <input
+          type="month"
+          value={selMonth}
+          onChange={(e) => applyMonth(e.target.value)}
+          className="bg-transparent text-white border-0 outline-none text-xs"
+          style={{ colorScheme: "dark" }}
+        />
+      </div>
+
+      {/* Date range */}
+      <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs">
+        <span className="text-slate-400 font-semibold">From:</span>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => onStartDate(e.target.value)}
+          className="bg-transparent text-white border-0 outline-none text-xs"
+          style={{ colorScheme: "dark" }}
+        />
+        <span className="text-slate-500">–</span>
+        <input
+          type="date"
+          value={endDate}
+          onChange={(e) => onEndDate(e.target.value)}
+          className="bg-transparent text-white border-0 outline-none text-xs"
+          style={{ colorScheme: "dark" }}
+        />
+      </div>
+
+      {/* Transport / client filter */}
+      {transportNames && transportNames.length > 0 && (
+        <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs">
+          <Users className="w-3.5 h-3.5 text-[#2388ff]" />
+          <select
+            value={transportName}
+            onChange={(e) => onTransportName(e.target.value)}
+            className="bg-transparent text-white border-0 outline-none text-xs cursor-pointer"
+          >
+            <option value="all" className="bg-slate-900">All Transports</option>
+            {transportNames.map((n: string) => (
+              <option key={n} value={n} className="bg-slate-900">{n}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <Button
+        size="sm"
+        onClick={onApply}
+        disabled={loading}
+        className="h-8 px-4 bg-[#2388ff] hover:bg-[#2388ff]/90 text-white font-semibold text-xs"
+      >
+        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+        <span className="ml-1.5">Apply</span>
+      </Button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN PAGE
+═══════════════════════════════════════════════════════════════ */
+export default function InvoicesPage() {
+  const [tab, setTab] = useState<Tab>("summary");
+
+  /* shared filter state */
+  const [startDate, setStartDate] = useState(getFirstOfMonth());
+  const [endDate, setEndDate] = useState(getLocalDate());
+  const [transportName, setTransportName] = useState("all");
+
+  /* data */
+  const [summaryBill, setSummaryBill] = useState<any>(null);
+  const [dsBill, setDsBill] = useState<any>(null);
+  const [combinedBill, setCombinedBill] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [transportNames, setTransportNames] = useState<string[]>([]);
+
+  /* ── fetch ── */
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        startDate,
+        endDate,
+        ...(transportName !== "all" ? { transportName } : {})
+      });
+
+      const [sumRes, dsRes, comRes] = await Promise.all([
+        api.get(`/invoices/summary-bill?${params}`),
+        api.get(`/invoices/ds-bill?${params}`),
+        api.get(`/invoices/combined-bill?${params}`)
+      ]);
+
+      if (sumRes.data.success) setSummaryBill(sumRes.data.data);
+      if (dsRes.data.success) setDsBill(dsRes.data.data);
+      if (comRes.data.success) setCombinedBill(comRes.data.data);
+
+      // Extract unique transport names from summary rows
+      if (sumRes.data.success) {
+        const names = [...new Set(
+          (sumRes.data.data.rows || [])
+            .map((r: any) => r.transportName)
+            .filter(Boolean)
+        )] as string[];
+        setTransportNames(names);
+      }
+    } catch (err) {
+      toast.error("Failed to fetch billing data");
+    } finally {
+      setLoading(false);
+    }
+  }, [startDate, endDate, transportName]);
+
+  useEffect(() => { fetchData(); }, []);
+
+  /* ─── SUMMARY PRINT HTML ─── */
+  const buildSummaryPrintHtml = () => {
+    const d = summaryBill;
+    if (!d) return "";
+    const rows = (d.rows || []).map((r: any, i: number) => `
+      <tr>
+        <td>${fmtDate(r.date)}</td>
+        <td class="tc">${r.summaryNo || i + 1}</td>
+        <td>${r.transportName || "—"}</td>
+        <td>${r.driverName || "—"}</td>
+        <td class="tr text-emerald-600">${r.credit > 0 ? fmtINR(r.credit) : "—"}</td>
+        <td class="tr text-red-600">${r.debit > 0 ? fmtINR(r.debit) : "—"}</td>
+        <td>${r.note || "—"}</td>
+      </tr>`).join("");
+
+    const content = `
+      <div class="section-title">Summary Register — ${fmtDate(startDate)} to ${fmtDate(endDate)}</div>
+      <table>
+        <thead><tr>
+          <th>Date</th><th>Summary No.</th><th>Transport Name</th><th>Driver</th>
+          <th class="tr">Credit (₹)</th><th class="tr">Debit (₹)</th><th>Note</th>
+        </tr></thead>
+        <tbody>${rows}
+          <tr class="totals-row">
+            <td colspan="4" style="text-align:right">TOTALS:</td>
+            <td class="tr credit">${fmtINR(d.totalCredit)}</td>
+            <td class="tr debit">${fmtINR(d.totalDebit)}</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="summary-box">
+        <div class="sum-card"><div class="label">Total Credit</div><div class="amount credit">${fmtINR(d.totalCredit)}</div></div>
+        <div class="sum-card"><div class="label">Total Debit</div><div class="amount debit">${fmtINR(d.totalDebit)}</div></div>
+        <div class="sum-card"><div class="label">Net Balance</div><div class="amount net">${fmtINR(d.netBalance)}</div></div>
+      </div>`;
+
+    return basePrintWrapper(
+      "Summary Invoice",
+      content,
+      `<div class="badge">Summary Invoice</div>`
+    );
+  };
+
+  /* ─── DS PRINT HTML ─── */
+  const buildDsPrintHtml = () => {
+    const d = dsBill;
+    if (!d) return "";
+    const rows = (d.rows || []).map((r: any, i: number) => `
+      <tr>
+        <td>${fmtDate(r.date)}</td>
+        <td class="tc">${r.pageNo || "—"}</td>
+        <td>${r.drNo || "—"}</td>
+        <td class="tr">${r.freight ? fmtINR(r.freight) : "—"}</td>
+        <td class="tr">${r.labour ? fmtINR(r.labour) : "—"}</td>
+        <td class="tr">${r.stationery ? fmtINR(r.stationery) : "—"}</td>
+        <td class="tr">${r.commission ? fmtINR(r.commission) : "—"}</td>
+        <td class="tr">${r.aoc ? fmtINR(r.aoc) : "—"}</td>
+        <td class="tr">${fmtINR(r.total || 0)}</td>
+      </tr>`).join("");
+
+    const t = d.totals || {};
+    const content = `
+      <div class="section-title">Delivery Statement — ${fmtDate(startDate)} to ${fmtDate(endDate)}</div>
+      <table>
+        <thead><tr>
+          <th>Date</th><th class="tc">Page No.</th><th>D.R. No.</th>
+          <th class="tr">Freight</th><th class="tr">Labour</th><th class="tr">Stationery</th>
+          <th class="tr">Commission</th><th class="tr">A.O.C.</th><th class="tr">Total</th>
+        </tr></thead>
+        <tbody>${rows}
+          <tr class="totals-row">
+            <td colspan="3" style="text-align:right">TOTALS:</td>
+            <td class="tr credit">${fmtINR(t.freight || 0)}</td>
+            <td class="tr debit">${fmtINR(t.labour || 0)}</td>
+            <td class="tr debit">${fmtINR(t.stationery || 0)}</td>
+            <td class="tr debit">${fmtINR(t.commission || 0)}</td>
+            <td class="tr debit">${fmtINR(t.aoc || 0)}</td>
+            <td class="tr">${fmtINR(t.grandTotal || 0)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="summary-box">
+        <div class="sum-card"><div class="label">Total Credit (Freight)</div><div class="amount credit">${fmtINR(d.totalCredit)}</div></div>
+        <div class="sum-card"><div class="label">Total Debit</div><div class="amount debit">${fmtINR(d.totalDebit)}</div></div>
+        <div class="sum-card"><div class="label">Net Amount</div><div class="amount net">${fmtINR(d.netAmount)}</div></div>
+      </div>`;
+
+    return basePrintWrapper("Delivery Statement Invoice", content, `<div class="badge">Delivery Statement Invoice</div>`);
+  };
+
+  /* ─── COMBINED PRINT HTML ─── */
+  const buildCombinedPrintHtml = () => {
+    const d = combinedBill;
+    if (!d) return "";
+    const sumRows = (d.summary?.rows || []).map((r: any) => `
+      <tr>
+        <td>${fmtDate(r.date)}</td>
+        <td class="tc">${r.summaryNo || "—"}</td>
+        <td>${r.transportName || "—"}</td>
+        <td class="tr credit">${r.credit > 0 ? fmtINR(r.credit) : "—"}</td>
+        <td class="tr debit">${r.debit > 0 ? fmtINR(r.debit) : "—"}</td>
+        <td>${r.note || "—"}</td>
+      </tr>`).join("");
+
+    const dsRows = (d.deliveryStatement?.rows || []).map((r: any) => `
+      <tr>
+        <td>${fmtDate(r.date)}</td>
+        <td class="tc">${r.pageNo || "—"}</td>
+        <td>${r.drNo || "—"}</td>
+        <td class="tr">${r.freight ? fmtINR(r.freight) : "—"}</td>
+        <td class="tr">${r.labour ? fmtINR(r.labour) : "—"}</td>
+        <td class="tr">${r.stationery ? fmtINR(r.stationery) : "—"}</td>
+        <td class="tr">${r.commission ? fmtINR(r.commission) : "—"}</td>
+        <td class="tr">${r.aoc ? fmtINR(r.aoc) : "—"}</td>
+        <td class="tr">${fmtINR(r.total || 0)}</td>
+      </tr>`).join("");
+
+    const content = `
+      <div class="section-title">A. Summary Register</div>
+      <table>
+        <thead><tr><th>Date</th><th class="tc">No.</th><th>Transport</th><th class="tr">Credit</th><th class="tr">Debit</th><th>Note</th></tr></thead>
+        <tbody>${sumRows}
+          <tr class="totals-row">
+            <td colspan="3" style="text-align:right">Summary Totals:</td>
+            <td class="tr credit">${fmtINR(d.summary?.totalCredit || 0)}</td>
+            <td class="tr debit">${fmtINR(d.summary?.totalDebit || 0)}</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="section-title" style="margin-top:24px">B. Delivery Statement</div>
+      <table>
+        <thead><tr><th>Date</th><th class="tc">Page</th><th>D.R. No.</th><th class="tr">Freight</th><th class="tr">Labour</th><th class="tr">Stationery</th><th class="tr">Commission</th><th class="tr">A.O.C.</th><th class="tr">Total</th></tr></thead>
+        <tbody>${dsRows}
+          <tr class="totals-row">
+            <td colspan="3" style="text-align:right">DS Totals:</td>
+            <td class="tr credit">${fmtINR(d.deliveryStatement?.totals?.freight || 0)}</td>
+            <td class="tr debit">${fmtINR(d.deliveryStatement?.totals?.labour || 0)}</td>
+            <td class="tr debit">${fmtINR(d.deliveryStatement?.totals?.stationery || 0)}</td>
+            <td class="tr debit">${fmtINR(d.deliveryStatement?.totals?.commission || 0)}</td>
+            <td class="tr debit">${fmtINR(d.deliveryStatement?.totals?.aoc || 0)}</td>
+            <td class="tr">${fmtINR(d.deliveryStatement?.totals?.grandTotal || 0)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="summary-box" style="margin-top:24px">
+        <div class="sum-card"><div class="label">Summary Net</div><div class="amount net">${fmtINR(d.summary?.netBalance || 0)}</div></div>
+        <div class="sum-card"><div class="label">DS Net</div><div class="amount net">${fmtINR(d.deliveryStatement?.netAmount || 0)}</div></div>
+        <div class="sum-card" style="border:2px solid #1a3a6b"><div class="label">Grand Total</div><div class="amount net" style="font-size:22px">${fmtINR(d.grandTotal || 0)}</div></div>
+      </div>`;
+
+    return basePrintWrapper("Combined Client Invoice", content, `<div class="badge">Combined Invoice</div>`);
+  };
+
+  /* ─── TABS ─── */
+  const tabs: { id: Tab; label: string; icon: any; color: string }[] = [
+    { id: "summary", label: "Summary Invoice", icon: FileText, color: "text-emerald-400" },
+    { id: "delivery", label: "Delivery Statement Invoice", icon: BarChart3, color: "text-blue-400" },
+    { id: "combined", label: "Combined Client Bill", icon: Calculator, color: "text-violet-400" },
+  ];
+
+  /* ─── ACTION BAR (shared) ─── */
+  function ActionBar({ onPrint, onPdf, printHtmlFn, pdfFilename }: any) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          onClick={() => printHtml(printHtmlFn())}
+          className="h-8 px-3 bg-[#2388ff] hover:bg-[#2388ff]/90 text-white font-semibold text-xs"
+        >
+          <Printer className="w-3.5 h-3.5 mr-1.5" /> Print
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => downloadPdfHtml(printHtmlFn(), pdfFilename)}
+          className="h-8 px-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold text-xs border border-slate-600"
+        >
+          <Download className="w-3.5 h-3.5 mr-1.5" /> PDF
+        </Button>
+      </div>
+    );
+  }
+
+  /* ─── PAGE ─── */
+  return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+        {/* ── PAGE HEADER ── */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
           <div>
-            <h2 className="text-3xl font-black tracking-tight text-white flex items-center gap-2">
-              <Calculator className="w-8 h-8 text-[#2388ff]" />
+            <h2 className="text-3xl font-black tracking-tight text-white flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#2388ff]/15 border border-[#2388ff]/30 flex items-center justify-center">
+                <Calculator className="w-5 h-5 text-[#2388ff]" />
+              </div>
               Billing & Invoices
             </h2>
-            <p className="text-muted-foreground text-sm mt-1">Manage client payments, run real-time reconciliation statements, and track revenues.</p>
-          </div>
-          <div className="flex gap-2">
-            <CreateInvoiceDialog onInvoiceCreated={fetchInvoices} />
+            <p className="text-slate-400 text-sm mt-1.5">
+              Transport accounting — monthly billing, reconciliation, and client invoices
+            </p>
           </div>
         </div>
 
-        {/* Aggregation Reconciliation Calculator */}
-        <Card className="border-slate-800 bg-slate-900/40 backdrop-blur-md overflow-hidden relative shadow-2xl">
-          <CardHeader className="bg-slate-900/60 border-b border-slate-800 py-4 px-6 flex flex-row items-center justify-between flex-wrap gap-4">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-[#2388ff] flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Summary + Delivery Statement Aggregator
-            </CardTitle>
+        {/* ── TABS ── */}
+        <div className="flex gap-1 bg-slate-900/60 border border-slate-800 rounded-xl p-1.5 w-fit">
+          {tabs.map((t) => {
+            const Icon = t.icon;
+            const isActive = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200",
+                  isActive
+                    ? "bg-slate-800 text-white shadow-md"
+                    : "text-slate-500 hover:text-slate-300"
+                )}
+              >
+                <Icon className={cn("w-4 h-4", isActive ? t.color : "")} />
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
 
-            {/* Date range picker */}
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1">
-                <Calendar className="w-3.5 h-3.5 text-[#2388ff]" />
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="bg-transparent text-white border-0 outline-none w-28 text-center"
-                  style={{ colorScheme: "dark" }}
-                />
-                <span className="text-slate-500 font-bold px-1">to</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="bg-transparent text-white border-0 outline-none w-28 text-center"
-                  style={{ colorScheme: "dark" }}
+        {/* ── FILTER BAR ── */}
+        <FilterBar
+          startDate={startDate}
+          endDate={endDate}
+          onStartDate={setStartDate}
+          onEndDate={setEndDate}
+          transportName={transportName}
+          onTransportName={setTransportName}
+          transportNames={transportNames}
+          onApply={fetchData}
+          loading={loading}
+        />
+
+        {/* ══════════════════════════════════════════
+            TAB 1 – SUMMARY INVOICE
+        ══════════════════════════════════════════ */}
+        {tab === "summary" && (
+          <div className="space-y-5">
+            {/* Stat cards */}
+            {summaryBill && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <StatCard label="Total Credit" value={fmtINR(summaryBill.totalCredit || 0)} color="text-emerald-400" icon={TrendingUp} />
+                <StatCard label="Total Debit" value={fmtINR(summaryBill.totalDebit || 0)} color="text-rose-400" icon={TrendingDown} />
+                <StatCard
+                  label="Net Balance"
+                  value={fmtINR(summaryBill.netBalance || 0)}
+                  color={summaryBill.netBalance >= 0 ? "text-[#2388ff]" : "text-rose-500"}
+                  icon={Calculator}
                 />
               </div>
+            )}
 
-              <Button
-                size="sm"
-                onClick={fetchAggregationData}
-                disabled={aggLoading}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 h-8"
-              >
-                {aggLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Refresh"}
-              </Button>
-
-              <Button
-                size="sm"
-                onClick={handlePrintStatement}
-                className="bg-[#2388ff] hover:bg-[#2388ff]/90 text-white font-semibold h-8"
-              >
-                <Printer className="w-3.5 h-3.5 mr-1" /> Print Statement
-              </Button>
-
-              <Button
-                size="sm"
-                onClick={handleDownloadPDFStatement}
-                className="bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 h-8"
-              >
-                <Download className="w-3.5 h-3.5 mr-1" /> Export PDF
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            {aggLoading ? (
-              <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
-                <Loader2 className="w-8 h-8 animate-spin text-[#2388ff]" />
-                <p className="text-xs uppercase tracking-wider font-semibold">Running database aggregates...</p>
+            {/* Table card */}
+            <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-slate-900/60">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-emerald-400" />
+                  <span className="text-sm font-bold text-white uppercase tracking-wide">Summary Register</span>
+                  <span className="text-[10px] text-slate-500 font-mono ml-1">
+                    {fmtDate(startDate)} – {fmtDate(endDate)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ActionBar printHtmlFn={buildSummaryPrintHtml} pdfFilename="summary-invoice" />
+                </div>
               </div>
-            ) : (
-              <div className="grid md:grid-cols-12 gap-6 items-stretch">
-                {/* Credits column */}
-                <div className="md:col-span-5 bg-slate-950/40 border border-slate-850 rounded-xl p-5 space-y-4">
-                  <h4 className="text-xs font-black uppercase text-emerald-400 tracking-widest border-b border-slate-800 pb-2">Credits (Revenue)</h4>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400">Summary Credit:</span>
-                      <span className="text-white font-mono font-semibold">₹ {aggregatedValues.summaryCredit.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400">DS Freight:</span>
-                      <span className="text-white font-mono font-semibold">₹ {aggregatedValues.dsFreight.toLocaleString()}</span>
-                    </div>
-                    <div className="h-px bg-slate-900 my-2" />
-                    <div className="flex justify-between items-center text-emerald-400 font-extrabold">
-                      <span>Total Credit:</span>
-                      <span className="font-mono text-base">₹ {aggregatedValues.totalCredits.toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Arithmetic sign */}
-                <div className="md:col-span-2 flex items-center justify-center">
-                  <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-lg text-slate-400">
-                    &minus;
-                  </div>
+              {loading ? (
+                <div className="flex items-center justify-center py-14 gap-3 text-slate-400">
+                  <Loader2 className="w-5 h-5 animate-spin text-[#2388ff]" />
+                  <span className="text-sm">Loading summary data...</span>
                 </div>
-
-                {/* Debits column */}
-                <div className="md:col-span-5 bg-slate-950/40 border border-slate-850 rounded-xl p-5 space-y-4">
-                  <h4 className="text-xs font-black uppercase text-rose-400 tracking-widest border-b border-slate-800 pb-2">Debits (Expenses Breakdown)</h4>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400">Summary Debit:</span>
-                      <span className="text-white font-mono font-semibold">₹ {aggregatedValues.summaryDebit.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400">DS Labour:</span>
-                      <span className="text-white font-mono font-semibold">₹ {aggregatedValues.dsLabour.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400">DS Stationery:</span>
-                      <span className="text-white font-mono font-semibold">₹ {aggregatedValues.dsStationery.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400">DS Commission:</span>
-                      <span className="text-white font-mono font-semibold">₹ {aggregatedValues.dsCommission.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400">DS A.O.C:</span>
-                      <span className="text-white font-mono font-semibold">₹ {aggregatedValues.dsDemurrage.toLocaleString()}</span>
-                    </div>
-                    <div className="h-px bg-slate-900 my-2" />
-                    <div className="flex justify-between items-center text-rose-400 font-extrabold">
-                      <span>Total Debit:</span>
-                      <span className="font-mono text-base">₹ {aggregatedValues.totalDebits.toLocaleString()}</span>
-                    </div>
-                  </div>
+              ) : !summaryBill || summaryBill.rows?.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-14 text-slate-500 gap-2">
+                  <AlertCircle className="w-8 h-8 opacity-40" />
+                  <p className="text-sm">No summary records for this period</p>
                 </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-900/80">
+                        <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-4 py-2.5">Date</th>
+                        <th className="text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2.5">S.No.</th>
+                        <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2.5">Transport Name</th>
+                        <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2.5">Driver</th>
+                        <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2.5">Challan No.</th>
+                        <th className="text-right text-[10px] font-bold uppercase tracking-widest text-emerald-600 px-3 py-2.5">Credit</th>
+                        <th className="text-right text-[10px] font-bold uppercase tracking-widest text-rose-500 px-3 py-2.5">Debit</th>
+                        <th className="text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 px-3 py-2.5">Note</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summaryBill.rows.map((r: any, i: number) => (
+                        <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                          <td className="px-4 py-2.5 font-mono text-slate-300 text-xs">{fmtDate(r.date)}</td>
+                          <td className="px-3 py-2.5 text-center text-slate-400 text-xs">{r.summaryNo || i + 1}</td>
+                          <td className="px-3 py-2.5 text-white font-medium text-xs">{r.transportName || "—"}</td>
+                          <td className="px-3 py-2.5 text-slate-400 text-xs">{r.driverName || "—"}</td>
+                          <td className="px-3 py-2.5 text-slate-400 text-xs font-mono">{r.challanNo || "—"}</td>
+                          <td className="px-3 py-2.5 text-right font-mono font-semibold text-emerald-400 text-xs">
+                            {r.credit > 0 ? fmtINR(r.credit) : "—"}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-mono font-semibold text-rose-400 text-xs">
+                            {r.debit > 0 ? fmtINR(r.debit) : "—"}
+                          </td>
+                          <td className="px-3 py-2.5 text-slate-500 text-xs">{r.note || "—"}</td>
+                        </tr>
+                      ))}
+                      {/* Totals row */}
+                      <tr className="bg-slate-800/80 border-t-2 border-[#2388ff]/40">
+                        <td colSpan={5} className="px-4 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Totals</td>
+                        <td className="px-3 py-3 text-right font-mono font-black text-emerald-400">{fmtINR(summaryBill.totalCredit)}</td>
+                        <td className="px-3 py-3 text-right font-mono font-black text-rose-400">{fmtINR(summaryBill.totalDebit)}</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
 
-                {/* Net Payable Highlight bar */}
-                <div className="col-span-12 bg-gradient-to-r from-[#2388ff]/10 via-blue-900/10 to-transparent border border-[#2388ff]/30 rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-[#2388ff]/20 text-[#2388ff] flex items-center justify-center shrink-0">
-                      <Calculator className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-extrabold text-white uppercase tracking-wider">Net Reconciled Amount</h4>
-                      <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">Summary + DS values within date range</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs text-slate-500 font-bold uppercase tracking-wider mr-2">Reconciliation Total</span>
+                  {/* Net Balance Bar */}
+                  <div className="px-5 py-4 bg-gradient-to-r from-[#2388ff]/10 to-transparent border-t border-slate-800 flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">Net Balance (Credit − Debit)</span>
                     <span className={cn(
-                      "text-2xl font-black tracking-wide font-mono",
-                      aggregatedValues.netReceivable >= 0 ? "text-emerald-400" : "text-rose-500"
+                      "text-2xl font-black font-mono",
+                      summaryBill.netBalance >= 0 ? "text-emerald-400" : "text-rose-500"
                     )}>
-                      ₹ {aggregatedValues.netReceivable.toLocaleString()}
+                      {fmtINR(summaryBill.netBalance || 0)}
                     </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════
+            TAB 2 – DELIVERY STATEMENT INVOICE
+        ══════════════════════════════════════════ */}
+        {tab === "delivery" && (
+          <div className="space-y-5">
+            {/* Stat cards */}
+            {dsBill && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <StatCard label="Total Freight (Credit)" value={fmtINR(dsBill.totalCredit || 0)} color="text-emerald-400" icon={TrendingUp} />
+                <StatCard label="Total Debit" value={fmtINR(dsBill.totalDebit || 0)} color="text-rose-400" icon={TrendingDown} />
+                <StatCard
+                  label="Net Amount"
+                  value={fmtINR(dsBill.netAmount || 0)}
+                  color={dsBill.netAmount >= 0 ? "text-[#2388ff]" : "text-rose-500"}
+                  icon={Calculator}
+                />
+              </div>
+            )}
+
+            {/* DS breakdown cards */}
+            {dsBill?.totals && (
+              <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                {[
+                  { label: "Freight", key: "freight", color: "text-emerald-400" },
+                  { label: "Labour", key: "labour", color: "text-rose-400" },
+                  { label: "Stationery", key: "stationery", color: "text-orange-400" },
+                  { label: "Commission", key: "commission", color: "text-amber-400" },
+                  { label: "A.O.C.", key: "aoc", color: "text-red-400" },
+                ].map(({ label, key, color }) => (
+                  <div key={key} className="bg-slate-900/40 border border-slate-800 rounded-xl p-3 text-center">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">{label}</p>
+                    <p className={`text-sm font-black font-mono ${color}`}>
+                      {fmtINR(dsBill.totals[key] || 0)}
+                    </p>
+                    <p className="text-[8px] text-slate-600 mt-0.5">
+                      {key === "freight" ? "Credit ↑" : "Debit ↓"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Table */}
+            <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-slate-900/60">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-blue-400" />
+                  <span className="text-sm font-bold text-white uppercase tracking-wide">Delivery Statement</span>
+                  <span className="text-[10px] text-slate-500 font-mono ml-1">
+                    {fmtDate(startDate)} – {fmtDate(endDate)}
+                  </span>
+                </div>
+                <ActionBar printHtmlFn={buildDsPrintHtml} pdfFilename="ds-invoice" />
+              </div>
+
+              {loading ? (
+                <div className="flex items-center justify-center py-14 gap-3 text-slate-400">
+                  <Loader2 className="w-5 h-5 animate-spin text-[#2388ff]" />
+                  <span className="text-sm">Loading delivery statement data...</span>
+                </div>
+              ) : !dsBill || dsBill.rows?.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-14 text-slate-500 gap-2">
+                  <AlertCircle className="w-8 h-8 opacity-40" />
+                  <p className="text-sm">No delivery statement records for this period</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs min-w-[900px]">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-900/80">
+                        {["Date", "Page No.", "D.R. No.", "Freight", "Labour", "Stationery", "Commission", "A.O.C.", "Total"].map((h, i) => (
+                          <th key={h} className={cn(
+                            "text-[10px] font-bold uppercase tracking-widest px-3 py-2.5",
+                            i < 3 ? "text-left text-slate-500" : i === 3 ? "text-right text-emerald-600" : "text-right text-rose-500",
+                            i === 8 ? "text-right text-[#2388ff]" : ""
+                          )}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dsBill.rows.map((r: any, i: number) => (
+                        <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                          <td className="px-3 py-2.5 font-mono text-slate-300">{fmtDate(r.date)}</td>
+                          <td className="px-3 py-2.5 text-center text-slate-400">{r.pageNo || "—"}</td>
+                          <td className="px-3 py-2.5 text-white font-mono">{r.drNo || "—"}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-emerald-400">{r.freight ? fmtINR(r.freight) : "—"}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-rose-400">{r.labour ? fmtINR(r.labour) : "—"}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-orange-400">{r.stationery ? fmtINR(r.stationery) : "—"}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-amber-400">{r.commission ? fmtINR(r.commission) : "—"}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-red-400">{r.aoc ? fmtINR(r.aoc) : "—"}</td>
+                          <td className="px-3 py-2.5 text-right font-mono font-bold text-white">{fmtINR(r.total || 0)}</td>
+                        </tr>
+                      ))}
+                      {/* Totals */}
+                      {dsBill.totals && (
+                        <tr className="bg-slate-800/80 border-t-2 border-[#2388ff]/40">
+                          <td colSpan={3} className="px-3 py-3 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Totals</td>
+                          <td className="px-3 py-3 text-right font-mono font-black text-emerald-400">{fmtINR(dsBill.totals.freight || 0)}</td>
+                          <td className="px-3 py-3 text-right font-mono font-black text-rose-400">{fmtINR(dsBill.totals.labour || 0)}</td>
+                          <td className="px-3 py-3 text-right font-mono font-black text-orange-400">{fmtINR(dsBill.totals.stationery || 0)}</td>
+                          <td className="px-3 py-3 text-right font-mono font-black text-amber-400">{fmtINR(dsBill.totals.commission || 0)}</td>
+                          <td className="px-3 py-3 text-right font-mono font-black text-red-400">{fmtINR(dsBill.totals.aoc || 0)}</td>
+                          <td className="px-3 py-3 text-right font-mono font-black text-white">{fmtINR(dsBill.totals.grandTotal || 0)}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+
+                  {/* Net bar */}
+                  <div className="px-5 py-4 bg-gradient-to-r from-blue-500/10 to-transparent border-t border-slate-800">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Credit Side (Freight)
+                      </span>
+                      <span className="text-base font-black font-mono text-emerald-400">{fmtINR(dsBill.totalCredit)}</span>
+                    </div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Debit Side (Labour + Stationery + Commission + A.O.C.)
+                      </span>
+                      <span className="text-base font-black font-mono text-rose-400">{fmtINR(dsBill.totalDebit)}</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-700">
+                      <span className="text-sm font-bold text-white uppercase tracking-wider">Net Amount (Credit − Debit)</span>
+                      <span className={cn(
+                        "text-2xl font-black font-mono",
+                        dsBill.netAmount >= 0 ? "text-emerald-400" : "text-rose-500"
+                      )}>{fmtINR(dsBill.netAmount || 0)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════
+            TAB 3 – COMBINED CLIENT BILL
+        ══════════════════════════════════════════ */}
+        {tab === "combined" && (
+          <div className="space-y-5">
+            {/* Grand total highlight */}
+            {combinedBill && (
+              <div className="bg-gradient-to-r from-violet-500/10 via-slate-900/60 to-transparent border border-violet-500/20 rounded-xl p-5 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center">
+                    <Calculator className="w-6 h-6 text-violet-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Combined Client Invoice</p>
+                    <p className="text-sm text-slate-300 mt-0.5">{fmtDate(startDate)} — {fmtDate(endDate)}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">Grand Total</p>
+                  <p className={cn(
+                    "text-3xl font-black font-mono",
+                    combinedBill.grandTotal >= 0 ? "text-violet-400" : "text-rose-500"
+                  )}>{fmtINR(combinedBill.grandTotal || 0)}</p>
+                </div>
+                <ActionBar printHtmlFn={buildCombinedPrintHtml} pdfFilename="combined-invoice" />
+              </div>
+            )}
+
+            {/* Two sections side by side */}
+            {combinedBill && (
+              <div className="grid md:grid-cols-2 gap-5">
+                {/* Summary Section */}
+                <div className="bg-slate-900/50 border border-emerald-500/20 rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-800 bg-emerald-500/5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-emerald-400" />
+                      <span className="text-sm font-bold text-white">Summary</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] text-slate-500 uppercase">Net</p>
+                      <p className={cn("text-sm font-black font-mono", combinedBill.summary?.netBalance >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                        {fmtINR(combinedBill.summary?.netBalance || 0)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Total Credit</span>
+                      <span className="font-mono font-semibold text-emerald-400">{fmtINR(combinedBill.summary?.totalCredit || 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Total Debit</span>
+                      <span className="font-mono font-semibold text-rose-400">{fmtINR(combinedBill.summary?.totalDebit || 0)}</span>
+                    </div>
+                    <div className="h-px bg-slate-800 my-2" />
+                    <div className="flex justify-between font-bold">
+                      <span className="text-white">Net Balance</span>
+                      <span className={cn("font-mono", combinedBill.summary?.netBalance >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                        {fmtINR(combinedBill.summary?.netBalance || 0)}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-mono">{combinedBill.summary?.rows?.length || 0} records</p>
+                  </div>
+                </div>
+
+                {/* DS Section */}
+                <div className="bg-slate-900/50 border border-blue-500/20 rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-800 bg-blue-500/5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-blue-400" />
+                      <span className="text-sm font-bold text-white">Delivery Statement</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] text-slate-500 uppercase">Net</p>
+                      <p className={cn("text-sm font-black font-mono", combinedBill.deliveryStatement?.netAmount >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                        {fmtINR(combinedBill.deliveryStatement?.netAmount || 0)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-2 text-sm">
+                    {[
+                      { label: "Freight (Credit)", key: "freight", color: "text-emerald-400" },
+                      { label: "Labour", key: "labour", color: "text-rose-400" },
+                      { label: "Stationery", key: "stationery", color: "text-orange-400" },
+                      { label: "Commission", key: "commission", color: "text-amber-400" },
+                      { label: "A.O.C.", key: "aoc", color: "text-red-400" },
+                    ].map(({ label, key, color }) => (
+                      <div key={key} className="flex justify-between">
+                        <span className="text-slate-400">{label}</span>
+                        <span className={cn("font-mono font-semibold", color)}>
+                          {fmtINR(combinedBill.deliveryStatement?.totals?.[key] || 0)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="h-px bg-slate-800 my-2" />
+                    <div className="flex justify-between font-bold">
+                      <span className="text-white">Net Amount</span>
+                      <span className={cn("font-mono", combinedBill.deliveryStatement?.netAmount >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                        {fmtINR(combinedBill.deliveryStatement?.netAmount || 0)}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-mono">{combinedBill.deliveryStatement?.rows?.length || 0} entries</p>
                   </div>
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
 
-        {/* Existing Stats Cards */}
-        <div className="grid md:grid-cols-4 gap-6">
-          <Card className="border-slate-800 bg-slate-900/40">
-            <CardHeader className="p-4 pb-0"><CardTitle className="text-xs uppercase text-slate-500 font-bold tracking-wider">Total Billed</CardTitle></CardHeader>
-            <CardContent className="p-4 pt-2">
-              <div className="text-2xl font-black text-white">₹{(totalBilled).toLocaleString()}</div>
-              <p className="text-[10px] text-emerald-400 mt-1 uppercase tracking-wider font-bold">Lifetime Billing Amount</p>
-            </CardContent>
-          </Card>
-          <Card className="border-slate-800 bg-slate-900/40">
-            <CardHeader className="p-4 pb-0"><CardTitle className="text-xs uppercase text-slate-500 font-bold tracking-wider">Pending Collected</CardTitle></CardHeader>
-            <CardContent className="p-4 pt-2">
-              <div className="text-2xl font-black text-yellow-500">₹{(pendingAmount).toLocaleString()}</div>
-              <p className="text-[10px] text-muted-foreground mt-1">{filteredInvoices.filter(inv => inv.status === 'unpaid').length} invoices outstanding</p>
-            </CardContent>
-          </Card>
-          <Card className="border-slate-800 bg-slate-900/40 border-l-rose-500 border-l-4">
-            <CardHeader className="p-4 pb-0"><CardTitle className="text-xs uppercase text-slate-500 font-bold tracking-wider">Pending Count</CardTitle></CardHeader>
-            <CardContent className="p-4 pt-2">
-              <div className="text-2xl font-black text-rose-500">
-                {filteredInvoices.filter(inv => inv.status === 'unpaid').length}
+            {!combinedBill && loading && (
+              <div className="flex items-center justify-center py-20 gap-3 text-slate-400">
+                <Loader2 className="w-6 h-6 animate-spin text-[#2388ff]" />
+                <span>Loading combined bill...</span>
               </div>
-              <p className="text-[10px] text-rose-400 mt-1 uppercase tracking-wider font-bold">Pending collections</p>
-            </CardContent>
-          </Card>
-          <Card className="border-slate-800 bg-slate-900/40">
-            <CardHeader className="p-4 pb-0"><CardTitle className="text-xs uppercase text-slate-500 font-bold tracking-wider">Paid Amount</CardTitle></CardHeader>
-            <CardContent className="p-4 pt-2">
-              <div className="text-2xl font-black text-emerald-400">₹{(paidAmount).toLocaleString()}</div>
-              <p className="text-[10px] text-emerald-500 mt-1 uppercase tracking-wider font-bold">High collection efficiency</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Invoices List Card */}
-        <Card className="border-slate-800 bg-slate-900/40">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <tr className="border-b border-slate-800 hover:bg-transparent text-slate-400">
-                  <TableHead className="font-bold">Invoice No.</TableHead>
-                  <TableHead className="font-bold">Client</TableHead>
-                  <TableHead className="font-bold">Shipment ID</TableHead>
-                  <TableHead className="font-bold">Amount</TableHead>
-                  <TableHead className="font-bold">Status</TableHead>
-                  <TableHead className="font-bold">Date</TableHead>
-                  <TableHead className="text-right font-bold">Actions</TableHead>
-                </tr>
-              </TableHeader>
-              <TableBody>
-                {invoicesLoading && invoiceList.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 animate-pulse text-slate-500 font-bold uppercase tracking-widest">Loading invoices...</TableCell>
-                  </TableRow>
-                ) : filteredInvoices.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-slate-500">
-                      <AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                      No invoices found
-                    </TableCell>
-                  </TableRow>
-                ) : filteredInvoices.map((inv) => (
-                  <TableRow key={inv._id} className="border-b border-slate-800/60 hover:bg-slate-900/40 transition-colors">
-                    <TableCell className="font-extrabold text-[#2388ff]">{inv.invoiceNo}</TableCell>
-                    <TableCell className="text-slate-300 font-medium">{inv.client?.name}</TableCell>
-                    <TableCell className="text-xs text-slate-500 font-mono">{inv.shipment?.shipmentId || "—"}</TableCell>
-                    <TableCell className="font-bold text-white">₹{inv.total?.toLocaleString()}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={cn(
-                        "px-2.5 py-0.5 capitalize text-[10px] font-extrabold border",
-                        inv.status === "paid" ? "text-emerald-400 border-emerald-500/20 bg-emerald-500/10" :
-                          inv.status === "unpaid" ? "text-yellow-500 border-yellow-500/20 bg-yellow-500/10" :
-                            "text-rose-500 border-rose-500/20 bg-rose-500/10"
-                      )}>
-                        {inv.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-slate-500 font-mono">{new Date(inv.createdAt).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 hover:bg-[#2388ff]/10 hover:text-[#2388ff]"
-                          onClick={() => {
-                            const pw = window.open("", "_blank");
-                            if (!pw) return;
-                            pw.document.write(`
-                              <html>
-                              <head>
-                                <title>Invoice ${inv.invoiceNo}</title>
-                                <style>
-                                  body { font-family: Arial, sans-serif; padding: 40px; color: #111; line-height: 1.5; }
-                                  .invoice-box { max-width: 800px; margin: auto; border: 1px solid #eee; padding: 30px; box-shadow: 0 0 10px rgba(0, 0, 0, .15); }
-                                  .invoice-header { display: flex; justify-content: space-between; border-bottom: 2px solid #ddd; padding-bottom: 20px; margin-bottom: 20px; }
-                                  .title { font-size: 24px; font-weight: bold; color: #2388ff; }
-                                  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                                  th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-                                  th { background: #f2f4f7; }
-                                  .total { text-align: right; font-weight: bold; font-size: 16px; margin-top: 20px; }
-                                </style>
-                              </head>
-                              <body onload="window.print();">
-                                <div class="invoice-box">
-                                  <div class="invoice-header">
-                                    <div>
-                                      <div class="title">INVOICE</div>
-                                      <div>SANT KANWAR RAM TRANSPORT CORP.</div>
-                                    </div>
-                                    <div style="text-align: right;">
-                                      <div><strong>Invoice No:</strong> ${inv.invoiceNo}</div>
-                                      <div><strong>Date:</strong> ${new Date(inv.createdAt).toLocaleDateString()}</div>
-                                      <div><strong>Due Date:</strong> ${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}</div>
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <strong>Bill To:</strong><br>
-                                    ${inv.client?.name || "—"}<br>
-                                    ${inv.client?.email || ""}<br>
-                                    ${inv.client?.phone || ""}
-                                  </div>
-                                  <table>
-                                    <thead>
-                                      <tr>
-                                        <th>Description</th>
-                                        <th style="text-align: right;">Amount</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      <tr>
-                                        <td>Shipment Carriage / Transport Services (Ref: ${inv.shipment?.shipmentId || "—"})</td>
-                                        <td style="text-align: right;">₹ ${(inv.amount || 0).toLocaleString()}</td>
-                                      </tr>
-                                      <tr>
-                                        <td>Tax (GST 18%)</td>
-                                        <td style="text-align: right;">₹ ${(inv.tax || 0).toLocaleString()}</td>
-                                      </tr>
-                                    </tbody>
-                                  </table>
-                                  <div class="total">Total: ₹ ${(inv.total || 0).toLocaleString()}</div>
-                                </div>
-                              </body>
-                              </html>
-                            `);
-                            pw.document.close();
-                          }}
-                        >
-                          <Printer className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+            )}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

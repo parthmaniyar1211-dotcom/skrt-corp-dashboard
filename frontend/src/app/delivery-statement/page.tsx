@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { useHeader } from "@/context/HeaderContext";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
 type DsRow = {
   id?: number | string;
@@ -32,14 +33,12 @@ export default function DeliveryStatementPage() {
   const router = useRouter();
   const { searchQuery } = useHeader();
   const [rows, setRows] = useState<DsRow[]>([]);
-
   const [pageNo, setPageNo] = useState("");
   const [dateSearch] = useState(() => new Date().toISOString().slice(0, 10));
-
   const [matchCount, setMatchCount] = useState(0);
-
   const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [lastSavedId, setLastSavedId] = useState<string | null>(null);
 
   const getMaxPageNo = async (): Promise<number> => {
     try {
@@ -284,7 +283,8 @@ export default function DeliveryStatementPage() {
       const entriesForApi = filledRows.map(({ id, ...rest }) => rest);
       const totals = getColumnTotals();
       const payloadAll = { pageNo, dateSearch, entries: entriesForApi, totals };
-      await api.post("/delivery-statement", payloadAll);
+      const saveRes = await api.post("/delivery-statement", payloadAll);
+      if (saveRes.data?.data?._id) setLastSavedId(saveRes.data.data._id);
       toast.success("Delivery Statement saved successfully.");
       const [maxPage, maxSno] = await Promise.all([getMaxPageNo(), getMaxSno()]);
       setPageNo(String(maxPage + 1));
@@ -378,6 +378,14 @@ export default function DeliveryStatementPage() {
             <Button size="sm" onClick={handleDownloadPDF} className="h-9 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold transition-all">
               <Download className="h-4 w-4 mr-1.5" /> Download PDF
             </Button>
+            {lastSavedId && (
+              <WhatsAppShareButton
+                recordType="delivery-statement"
+                recordId={lastSavedId}
+                label="Share"
+                size="sm"
+              />
+            )}
           </div>
         </div>
 

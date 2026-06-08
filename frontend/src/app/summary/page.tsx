@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import api from "@/lib/api";
 import { useHeader } from "@/context/HeaderContext";
 import { cn } from "@/lib/utils";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
 type SummaryRow = {
   id?: number | string;
@@ -71,6 +72,7 @@ export default function SummaryPage() {
   const [date] = useState(today());
   const [matchCount, setMatchCount] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [lastSavedId, setLastSavedId] = useState<string | null>(null);
   const [rows, setRows] = useState<SummaryRow[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [vehicleList, setVehicleList] = useState<string[]>([]);
@@ -544,7 +546,8 @@ export default function SummaryPage() {
       });
 
       const payload = { date, entries: entriesForApi };
-      await api.post("/summary", payload);
+      const saveRes = await api.post("/summary", payload);
+      if (saveRes.data?.data?._id) setLastSavedId(saveRes.data.data._id);
       toast.success("Summary saved successfully.");
       const maxSno = await getMaxSno();
       setRows(Array.from({ length: 1 }, (_, i) => emptyRow(Date.now() + i, String(maxSno + i + 1))));
@@ -642,6 +645,14 @@ export default function SummaryPage() {
             <Button size="sm" onClick={handleDownloadPDF} className="h-9 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold transition-all">
               <Download className="h-4 w-4 mr-1" /> PDF
             </Button>
+            {lastSavedId && (
+              <WhatsAppShareButton
+                recordType="summary"
+                recordId={lastSavedId}
+                label="Share"
+                size="sm"
+              />
+            )}
           </div>
         </div>
 

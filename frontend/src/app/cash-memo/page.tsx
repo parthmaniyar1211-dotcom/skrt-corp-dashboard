@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Printer, Download, Save, Plus, CheckCircle2, ArrowLeft } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
 const today = () => {
   const d = new Date();
@@ -48,6 +49,7 @@ export default function CashMemoPage() {
   const router = useRouter();
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
+  const [lastSavedId, setLastSavedId] = useState<string | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
 
   const totalRs = amountFields.reduce((sum, f) => sum + (parseFloat(form[f.key] as string) || 0), 0);
@@ -115,7 +117,7 @@ export default function CashMemoPage() {
     if (!form.date) { toast.error("Date is required"); return false; }
     setSaving(true);
     try {
-      await api.post("/cash-memo", {
+      const res = await api.post("/cash-memo", {
         ...form,
         freight: parseFloat(form.freight) || 0,
         freightPaise: parseFloat(form.freightPaise) || 0,
@@ -129,6 +131,7 @@ export default function CashMemoPage() {
         aocPaise: parseFloat(form.aocPaise) || 0,
         totalAmount: totalRs,
       });
+      if (res.data?.data?._id) setLastSavedId(res.data.data._id);
       toast.success("Cash memo saved successfully!");
 
       // Update entry's delivery info
@@ -346,8 +349,13 @@ export default function CashMemoPage() {
             >
               <Download className="h-4 w-4" /> Download PDF
             </Button>
-
-          </div>
+            {lastSavedId && (
+              <WhatsAppShareButton
+                recordType="cash-memo"
+                recordId={lastSavedId}
+                label="Share"
+              />
+            )}
         </div>
 
         {/* Receipt card container */}

@@ -13,7 +13,9 @@ import {
   Settings,
   LogOut,
   Package,
-  Warehouse
+  Warehouse,
+  FolderOpen,
+  Archive
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -24,10 +26,11 @@ const menuItems = [
   { icon: Package, label: "Shipments", href: "/shipments" },
   { icon: MapPin, label: "Live Tracking", href: "/tracking" },
   { icon: Truck, label: "Records", href: "/fleet" },
+  { icon: FolderOpen, label: "Record Center", href: "/records" },
   // { icon: Users, label: "Drivers", href: "/drivers" },
   { icon: Users, label: "Clients", href: "/clients" },
   { icon: FileText, label: "Expenses", href: "/expenses" },
-  { icon: FileText, label: "Invoices", href: "/invoices" },
+  { icon: Archive, label: "Invoices", href: "/invoices" },
   // { icon: FileText, label: "Delivery Statement", href: "/delivery-statement" },
   { icon: BarChart3, label: "Analytics", href: "/analytics" },
   { icon: Settings, label: "Settings", href: "/settings" },
